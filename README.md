@@ -12,6 +12,13 @@ Guides mark the 3:4 profile-grid crop and the zone Instagram's reel UI covers. S
 lifts its panel — and Layers with it — to the top of the inspector, so editing a caption never
 means scrolling past Background and Overlay to reach the controls.
 
+**Resize by dragging** — a selected element gets corner grips. Drag one to scale it and the
+opposite corner stays pinned, so it grows the way you are pulling. Text scales its wrap width
+with the font size, so a caption grows as a block instead of re-wrapping as it gets bigger. The
+same grips resize logos, rules and the subject cutout, staying inside the limits the sliders use.
+A thin element keeps only the bottom-right grip, so there is still something left to grab when
+moving it.
+
 **Part colour** — select any words inside a caption and give just those a different colour, so
 one heading can carry an accent without being split into separate layers. Select in the text
 box, then pick from **Part colour**; **Clear** returns the selection to the layer colour, or

@@ -109,6 +109,18 @@ aside.right{border-left:1px solid var(--line)}
 #preview{display:block;background:#000;touch-action:none;cursor:default}
 #preview.grab{cursor:grab}#preview.grabbing{cursor:grabbing}
 #selBox{position:absolute;pointer-events:none;border:1.5px solid var(--accent);border-radius:2px;display:none;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+/* Corner grips. #selBox stays click-through so the canvas keeps its own drag;
+   only the grips take pointer events. */
+#selBox .gr{position:absolute;width:12px;height:12px;background:var(--accent);border:1.5px solid var(--accent-ink);border-radius:2px;pointer-events:auto;touch-action:none;box-shadow:0 1px 3px rgba(0,0,0,.55)}
+#selBox .gr:hover{background:#f0bd63;transform:scale(1.15)}
+#selBox .gr.nw{left:-7px;top:-7px;cursor:nwse-resize}
+#selBox .gr.ne{right:-7px;top:-7px;cursor:nesw-resize}
+#selBox .gr.se{right:-7px;bottom:-7px;cursor:nwse-resize}
+#selBox .gr.sw{left:-7px;bottom:-7px;cursor:nesw-resize}
+/* On a thin element (a rule, a short badge) four grips would cover the whole
+   thing and leave nothing to grab for moving it — keep only the corner one. */
+#selBox.tiny .gr{width:9px;height:9px}
+#selBox.tiny .gr.nw,#selBox.tiny .gr.ne,#selBox.tiny .gr.sw{display:none}
 #selBox::after{content:attr(data-label);position:absolute;left:-1px;top:-18px;font:10px var(--font-mono);background:var(--accent);color:var(--accent-ink);padding:1px 5px;border-radius:2px;letter-spacing:.06em}
 #guides{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:none}
 #guides.on{display:block}
@@ -271,6 +283,7 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
       <h3>Shortcuts</h3>
       <div class="mono" style="color:var(--dim);line-height:1.9">
         <kbd>drag</kbd> move layer · <kbd>dbl-click</kbd> edit text<br>
+        <kbd>corners</kbd> resize the selection<br>
         <kbd>⌫</kbd> delete · <kbd>D</kbd> duplicate · <kbd>B</kbd> behind subject<br>
         <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo · <kbd>G</kbd> guides · <kbd>drop</kbd> a file on the canvas
       </div>
@@ -288,7 +301,7 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
         <rect x="0" y="1470" width="1080" height="450" fill="none" stroke="rgba(127,179,166,.45)" stroke-width="3" stroke-dasharray="6 10"/>
         <text x="48" y="1890" font-family="JetBrains Mono, monospace" font-size="26" fill="rgba(127,179,166,.7)">REEL UI OVERLAY ZONE (caption, sound, buttons)</text>
       </svg>
-      <div id="selBox" data-label=""></div>
+      <div id="selBox" data-label=""><i class="gr nw" data-c="nw"></i><i class="gr ne" data-c="ne"></i><i class="gr se" data-c="se"></i><i class="gr sw" data-c="sw"></i></div>
       <div id="dropZone"><div><b>Drop to set the background</b><span>PNG with transparency lands as a cutout</span></div></div>
     </div>
     <div id="stageBar">
@@ -345,7 +358,7 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
       <div class="row"><label for="grain">Grain</label><div class="ctl"><input type="range" id="grain" min="0" max="0.5" step="0.01"><span class="val" id="grainV"></span></div></div>
     </div>
 
-    <div class="sec">
+    <div class="sec" id="secSubject">
       <h3>Subject cutout <span class="acts"><button class="chip" id="subjOn" aria-pressed="true">On</button></span></h3>
       <div id="subjCtl">
         <div class="row"><label>Cutout</label><div class="ctl"><select id="subjImage"></select></div></div>

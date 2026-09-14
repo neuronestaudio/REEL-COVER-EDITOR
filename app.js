@@ -483,6 +483,7 @@ function drawSelection(z) {
   if (!sel || !b) { sb.style.display = 'none'; return; }
   sb.style.display = 'block'; sb.style.left = b.x * z - 2 + 'px'; sb.style.top = b.y * z - 2 + 'px'; sb.style.width = b.w * z + 4 + 'px'; sb.style.height = b.h * z + 4 + 'px';
   const l = doc.layers.find(x => x.id === sel); sb.dataset.label = sel === '__subject' ? 'subject' : l ? l.type : '';
+  sb.classList.toggle('tiny', b.w * z < 46 || b.h * z < 46);
 }
 let rafPending = false;
 function renderAll() {
@@ -523,6 +524,50 @@ preview.addEventListener('pointermove', e => {
     t.x = +t.x.toFixed(4); t.y = +t.y.toFixed(4); renderAll(); ['bgX', 'bgY'].forEach(id => $('#' + id)._sync()); return;
   }
   t.x = +(drag.x0 + dx).toFixed(4); t.y = +(drag.y0 + dy).toFixed(4); renderAll(); syncPropsLite();
+});
+/* Corner grips resize the selected element. Each type has one scalar that means
+   "size", captured when the drag starts so the whole gesture scales from the
+   original rather than compounding. Text scales its wrap width alongside the
+   font size, so the block grows as a block instead of re-wrapping as it grows. */
+function resizeGrip() {
+  if (sel === '__subject') { const s = doc.subject, s0 = s.scale; return { obj: s, apply: k => s.scale = +clamp(s0 * k, 0.3, 1.6).toFixed(3), sync: ['subjScale'] }; }
+  const l = L(); if (!l) return null;
+  if (l.type === 'text') { const z0 = l.size, w0 = l.width; return { obj: l, apply: k => { l.size = Math.round(clamp(z0 * k, 20, 400)); l.width = +clamp(w0 * k, 0.2, 1).toFixed(3); }, sync: ['tSize', 'tWidth'] }; }
+  if (l.type === 'logo') { const z0 = l.size; return { obj: l, apply: k => l.size = +clamp(z0 * k, 0.05, 0.8).toFixed(3), sync: ['lSize'] }; }
+  if (l.type === 'rule') { const w0 = l.width; return { obj: l, apply: k => l.width = +clamp(w0 * k, 0.05, 1).toFixed(3), sync: ['rWidth'] }; }
+  return null;
+}
+const selBoxOf = () => sel === '__subject' ? boxes.__subject : boxes[sel];
+let rz = null;
+$$('#selBox .gr').forEach(h => {
+  h.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation();
+    const g = resizeGrip(), b = selBoxOf(); if (!g || !b) return;
+    const c = h.dataset.c;
+    // anchor on the opposite corner, so that corner stays put while dragging
+    const ax = c.includes('w') ? 1 : 0, ay = c.includes('n') ? 1 : 0;
+    const anchor = { x: b.x + ax * b.w, y: b.y + ay * b.h };
+    const p = canvasPoint(e);
+    rz = { g, anchor, ax, ay, d0: Math.max(Math.hypot(p.x - anchor.x, p.y - anchor.y), 8), before: snapshot(), moved: false };
+    h.setPointerCapture(e.pointerId);
+  });
+  h.addEventListener('pointermove', e => {
+    if (!rz) return;
+    const p = canvasPoint(e);
+    rz.g.apply(Math.hypot(p.x - rz.anchor.x, p.y - rz.anchor.y) / rz.d0);
+    rz.moved = true;
+    renderPreview();                       // synchronous, so `boxes` is fresh below
+    const b = selBoxOf();
+    if (b) {                               // translate the element so the anchor corner holds
+      const o = rz.g.obj;
+      o.x = +(o.x + (rz.anchor.x - (b.x + rz.ax * b.w)) / W).toFixed(4);
+      o.y = +(o.y + (rz.anchor.y - (b.y + rz.ay * b.h)) / H).toFixed(4);
+      renderPreview();
+    }
+    rz.g.sync.forEach(id => $('#' + id)._sync());
+  });
+  const end = () => { if (rz) { if (rz.moved) { undoStack.push(rz.before); redoStack = []; updateUndoBtns(); scheduleSave(); } rz = null; } };
+  h.addEventListener('pointerup', end); h.addEventListener('pointercancel', end);
 });
 // wheel over the canvas zooms the background image
 preview.addEventListener('wheel', e => {
@@ -847,7 +892,7 @@ function syncProps() {
 let poppedFor = null;
 function focusPropPanel() {
   const insp = $('#inspector'); if (!insp) return;
-  const active = [$('#propText'), $('#propRule'), $('#propLogo')].find(p => !p.hidden);
+  const active = sel === '__subject' ? $('#secSubject') : [$('#propText'), $('#propRule'), $('#propLogo')].find(p => !p.hidden);
   $$('#inspector > .sec').forEach(s => s.style.order = active ? '3' : '');
   if (!active) { poppedFor = null; return; }
   active.style.order = '0';
