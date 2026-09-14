@@ -8,7 +8,9 @@ no backend, no accounts. Everything runs in the visitor's browser.
 **Editor** — WYSIWYG 1080×1920 canvas. Drag captions and the subject cutout directly on the
 artwork, double-click text to edit. Layers can be text, badges, rules or logos, each with font,
 weight, tracking, leading, box style, outline, shadow and rotation. Six starting templates.
-Guides mark the 3:4 profile-grid crop and the zone Instagram's reel UI covers.
+Guides mark the 3:4 profile-grid crop and the zone Instagram's reel UI covers. Selecting a layer
+lifts its panel — and Layers with it — to the top of the inspector, so editing a caption never
+means scrolling past Background and Overlay to reach the controls.
 
 **Part colour** — select any words inside a caption and give just those a different colour, so
 one heading can carry an accent without being split into separate layers. Select in the text
@@ -20,6 +22,14 @@ wrap, CAPS and re-alignment.
 **Backgrounds** — tile picker of every image in the library, plus upload, or drag a file
 anywhere onto the canvas. Drag the canvas to pan, scroll to zoom, or use Fill / Fit / Reset.
 Also solid colours, gradients and six generated textures.
+
+**Drop photos** — drag pictures in from the desktop. On the canvas the first one becomes the
+background (a transparent PNG becomes the subject cutout instead) and any others become covers
+of their own, so a whole shoot can go in at once. **Dropped on the profile grid they become
+finished example covers in place** — photo as the background, a template's type over it, landing
+in the slot they were dropped on — which is the quickest way to see how a set of photos reads as
+a row of reels. Templates cycle as you drop, so a batch comes out varied rather than nine copies
+of one caption.
 
 **Depth** — any layer can sit behind the subject cutout. The `FRT` / `BHD` button on each
 layer row, or `B` on the selected layer.

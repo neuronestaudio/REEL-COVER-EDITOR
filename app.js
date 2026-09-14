@@ -636,13 +636,65 @@ const dz = $('#dropZone'); let dzDepth = 0;
 $('#stage').addEventListener('dragleave', () => { if (--dzDepth <= 0) { dzDepth = 0; dz.classList.remove('on'); } });
 $('#stage').addEventListener('drop', async e => {
   e.preventDefault(); dzDepth = 0; dz.classList.remove('on');
-  const f = e.dataTransfer.files[0]; if (!f) return;
+  // The first photo goes into the cover being edited; any others become covers
+  // of their own, so a whole shoot can be dropped in one go.
+  const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+  const f = files[0]; if (!f) return toast('That isn’t an image file');
+  const rest = files.slice(1);
+  let done = false;
   if (f.type === 'image/png' || f.type === 'image/webp') { // transparency? treat as a cutout
     const im = await new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = URL.createObjectURL(f); });
-    if (im && hasAlpha(im)) { const rec = await store.putAsset(f, 'cutout', f.name.replace(/\.[^.]+$/, '')); pushUndo(); doc.subject = { ...doc.subject, on: true, image: rec.id }; commit(); syncAll(); refreshAssetSelects(); return toast('Added as a subject cutout'); }
+    if (im && hasAlpha(im)) { const rec = await store.putAsset(f, 'cutout', f.name.replace(/\.[^.]+$/, '')); pushUndo(); doc.subject = { ...doc.subject, on: true, image: rec.id }; commit(); syncAll(); refreshAssetSelects(); toast('Added as a subject cutout'); done = true; }
   }
-  setBackgroundFromFile(f);
+  if (!done) await setBackgroundFromFile(f);
+  if (rest.length) await coversFromFiles(rest);
 });
+/* Dropping a photo on the profile grid turns it straight into an example cover:
+   the picture as the background with a template's type over it. The shipped
+   subject cutout is switched off — it is a different person's silhouette and
+   would look wrong pasted over a new photo. Templates cycle, so dropping a
+   batch gives a varied grid instead of the same caption nine times. */
+const dtHasFiles = e => [...(e.dataTransfer ? e.dataTransfer.types : [])].includes('Files');
+let tplCycle = 0;
+async function coverFromImage(f, at) {
+  const rec = await store.putAsset(f, 'bg', f.name.replace(/\.[^.]+$/, '').slice(0, 40));
+  await new Promise(r => { const im = new Image(); im.onload = im.onerror = r; im.src = rec.url; imgCache[rec.id] = im; });
+  const d = TEMPLATES[tplCycle++ % TEMPLATES.length].make();
+  d.id = uid(); d.createdAt = d.updatedAt = Date.now(); d.name = rec.name || 'Dropped cover';
+  d.bg = { ...d.bg, type: 'image', image: rec.id, fit: 'fill', scale: 1, x: 0, y: 0, blur: 0, bright: 1, sat: 1 };
+  d.subject = { ...d.subject, on: false };
+  const cr = { id: d.id, name: d.name, createdAt: d.createdAt, updatedAt: d.updatedAt, doc: d, versions: [] };
+  covers.push(cr);
+  try { await store.saveCover(cr); } catch (e) { console.warn(e); }
+  if (!Array.isArray(settings.gridOrder)) settings.gridOrder = [];
+  const o = settings.gridOrder;
+  o.splice(at == null ? o.length : clamp(at, 0, o.length), 0, d.id);
+  saveSettingsSoon();
+  return cr;
+}
+async function coversFromFiles(files, at) {
+  const imgs = [...files].filter(f => f.type.startsWith('image/'));
+  if (!imgs.length) return toast('That isn’t an image file');
+  setStatus('building covers…');
+  for (let i = 0; i < imgs.length; i++) await coverFromImage(imgs[i], at == null ? null : at + i);
+  renderGrid(); renderCoverList(); setStatus('saved · this browser', 'ok');
+  toast(imgs.length === 1 ? 'Added as a cover — double-click it to open' : `Added ${imgs.length} covers — double-click one to open`);
+}
+/* Mark an element as a place photos can be dropped to become covers. getAt()
+   says where in the grid order the first one lands. */
+function wireCoverDrop(el, getAt) {
+  el.addEventListener('dragover', e => { if (!dtHasFiles(e)) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; el.classList.add('filedrop'); });
+  el.addEventListener('dragleave', () => el.classList.remove('filedrop'));
+  el.addEventListener('drop', e => {
+    if (!dtHasFiles(e)) return;
+    e.preventDefault(); e.stopPropagation(); el.classList.remove('filedrop');
+    coversFromFiles(e.dataTransfer.files, getAt());
+  });
+}
+// Drops in the gaps between tiles land at the end of the grid.
+wireCoverDrop($('#igrid'), () => null);
+// A file dropped anywhere else would otherwise make the browser navigate to it.
+['dragover', 'drop'].forEach(ev => window.addEventListener(ev, e => { if (dtHasFiles(e)) e.preventDefault(); }));
 function hasAlpha(im) {
   const c = document.createElement('canvas'); const n = 64; c.width = c.height = n; const x = c.getContext('2d'); x.drawImage(im, 0, 0, n, n);
   const d = x.getImageData(0, 0, n, n).data; let clear = 0; for (let i = 3; i < d.length; i += 4) if (d[i] < 24) clear++;
@@ -786,6 +838,25 @@ function syncProps() {
   }
   if (l && l.type === 'logo') $('#lImage').value = l.image || '';
   bound.forEach(b => b._sync());
+  focusPropPanel();
+}
+/* Lift the selected layer's panel (and Layers under it) to the top of the
+   inspector, so editing a caption never means scrolling past Background and
+   Overlay to reach it. Only re-scrolls and flashes when the selection actually
+   changes — syncProps also runs on every slider tick. */
+let poppedFor = null;
+function focusPropPanel() {
+  const insp = $('#inspector'); if (!insp) return;
+  const active = [$('#propText'), $('#propRule'), $('#propLogo')].find(p => !p.hidden);
+  $$('#inspector > .sec').forEach(s => s.style.order = active ? '3' : '');
+  if (!active) { poppedFor = null; return; }
+  active.style.order = '0';
+  $('#secLayers').style.order = '1';
+  if (poppedFor !== sel) {
+    poppedFor = sel;
+    insp.scrollTop = 0;
+    active.classList.remove('popped'); void active.offsetWidth; active.classList.add('popped');
+  }
 }
 function syncPropsLite() { ['subjX', 'subjY'].forEach(id => $('#' + id)._sync()); }
 function syncAll() {
@@ -897,10 +968,16 @@ function renderGrid() {
   for (let i = 0; i < n; i++) {
     const t = document.createElement('div'); t.className = 'tile'; const r = order[i];
     if (r) { const d = r.id === doc?.id ? doc : r.doc; t.innerHTML = `<div class="play"></div><div class="views">▶ ${(3.1 + (i * 7 % 11)).toFixed(1)}K</div>`; t.prepend(thumbCanvas(d, 130 * 2)); t.draggable = true; t.dataset.id = r.id; t.title = r.name;
-      t.addEventListener('dragstart', e => { gridDrag = r.id; e.dataTransfer.effectAllowed = 'move'; }); t.addEventListener('dragover', e => { e.preventDefault(); t.classList.add('drop'); }); t.addEventListener('dragleave', () => t.classList.remove('drop'));
-      t.addEventListener('drop', e => { e.preventDefault(); t.classList.remove('drop'); reorderGrid(gridDrag, r.id); });
+      t.addEventListener('dragstart', e => { gridDrag = r.id; e.dataTransfer.effectAllowed = 'move'; }); t.addEventListener('dragover', e => { if (dtHasFiles(e)) return; e.preventDefault(); t.classList.add('drop'); }); t.addEventListener('dragleave', () => t.classList.remove('drop'));
+      t.addEventListener('drop', e => { if (dtHasFiles(e)) return; e.preventDefault(); t.classList.remove('drop'); reorderGrid(gridDrag, r.id); });
       t.addEventListener('dblclick', () => { loadDoc(d); switchView('editor'); });
-    } else { t.classList.add('ph'); t.textContent = i === order.length ? 'next reel' : ''; t.addEventListener('dragover', e => e.preventDefault()); t.addEventListener('drop', e => { e.preventDefault(); if (gridDrag && !settings.gridOrder.includes(gridDrag)) { settings.gridOrder.push(gridDrag); saveSettingsSoon(); renderGrid(); } }); }
+      wireCoverDrop(t, () => i);                       // a photo dropped here lands in this slot
+    } else {
+      t.classList.add('ph'); t.textContent = i === order.length ? 'drop a photo' : '';
+      t.addEventListener('dragover', e => { if (dtHasFiles(e)) return; e.preventDefault(); });
+      t.addEventListener('drop', e => { if (dtHasFiles(e)) return; e.preventDefault(); if (gridDrag && !settings.gridOrder.includes(gridDrag)) { settings.gridOrder.push(gridDrag); saveSettingsSoon(); renderGrid(); } });
+      wireCoverDrop(t, () => Math.min(i, order.length));
+    }
     ig.appendChild(t);
   }
   const gl = $('#gridList'); gl.innerHTML = ''; $('#gridEmpty').hidden = order.length > 0;
