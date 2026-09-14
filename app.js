@@ -102,15 +102,81 @@ function grainPattern(ctx) {
 
 /* ---------------- renderer ---------------- */
 function roundRect(x, X, Y, w, h, r) { r = Math.min(r, w / 2, h / 2); x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + w, Y, X + w, Y + h, r); x.arcTo(X + w, Y + h, X, Y + h, r); x.arcTo(X, Y + h, X, Y, r); x.arcTo(X, Y, X + w, Y, r); x.closePath(); }
+/* Wrapping records, for every character it lays down, the index that character
+   came from in the layer's source text. That mapping is what lets a colour span
+   survive word wrap — a run can start mid-line and the renderer still knows
+   where it sits. Indices are UTF-16 code units, the same units a textarea's
+   selectionStart/End use, so a selection maps straight onto a span.
+   Returns [{ text, idx: [{ ch, i }] }]; i is -1 for a space wrapping inserted. */
 function wrapLines(x, text, maxW) {
-  const out = [];
-  for (const para of String(text).split('\n')) {
-    const words = para.split(/\s+/).filter(Boolean); if (!words.length) { out.push(''); continue; }
-    let line = words[0];
-    for (let i = 1; i < words.length; i++) { const t = line + ' ' + words[i]; if (x.measureText(t).width <= maxW) line = t; else { out.push(line); line = words[i]; } }
-    out.push(line);
+  const src = String(text), out = [];
+  const chars = (s, at) => Array.from({ length: s.length }, (_, k) => ({ ch: s[k], i: at + k }));
+  let pos = 0;
+  for (const para of src.split('\n')) {
+    const start = pos; pos += para.length + 1;
+    const words = []; const re = /\S+/g; let m;
+    while ((m = re.exec(para))) words.push({ t: m[0], at: start + m.index });
+    if (!words.length) { out.push({ text: '', idx: [] }); continue; }
+    let t = words[0].t, idx = chars(words[0].t, words[0].at);
+    for (let i = 1; i < words.length; i++) {
+      const w = words[i], cand = t + ' ' + w.t;
+      if (x.measureText(cand).width <= maxW) { t = cand; idx.push({ ch: ' ', i: -1 }); idx = idx.concat(chars(w.t, w.at)); }
+      else { out.push({ text: t, idx }); t = w.t; idx = chars(w.t, w.at); }
+    }
+    out.push({ text: t, idx });
   }
   return out;
+}
+/* Uppercase one code unit at a time so the string length never changes and the
+   span indices still line up — plain toUpperCase turns 'ß' into 'SS'. */
+function upperKeepLen(s) {
+  let o = '';
+  for (let i = 0; i < s.length; i++) { const c = s[i], u = c.toUpperCase(); o += u.length === 1 ? u : c; }
+  return o;
+}
+/* Colour spans are half-open [s,e) ranges over the source text that override the
+   layer colour. They are kept sorted and non-overlapping, so the last colour
+   applied to a range is the one that shows. */
+function normSpans(l) { return Array.isArray(l && l.spans) ? l.spans.filter(s => s && s.e > s.s) : []; }
+function spanColorAt(spans, i, base) {
+  for (const s of spans) if (i >= s.s && i < s.e) return s.color;
+  return base;
+}
+/* Cut [s,e) out of every existing span, splitting any span that straddles it. */
+function clipSpans(spans, s, e) {
+  const out = [];
+  for (const sp of spans) {
+    if (sp.e <= s || sp.s >= e) { out.push(sp); continue; }
+    if (sp.s < s) out.push({ ...sp, e: s });
+    if (sp.e > e) out.push({ ...sp, s: e });
+  }
+  return out;
+}
+/* An edit to the text shifts every span after the edit point. Diff old against
+   new by common prefix and suffix, then move the endpoints; a span whose whole
+   range was typed over collapses and is dropped. */
+function remapSpans(spans, oldT, newT) {
+  spans = normSpans({ spans });
+  if (!spans.length || oldT === newT) return spans;
+  const lim = Math.min(oldT.length, newT.length);
+  let p = 0; while (p < lim && oldT[p] === newT[p]) p++;
+  let suf = 0; while (suf < lim - p && oldT[oldT.length - 1 - suf] === newT[newT.length - 1 - suf]) suf++;
+  const tailStart = oldT.length - suf, insEnd = newT.length - suf, delta = newT.length - oldT.length;
+  const map = i => i <= p ? i : i >= tailStart ? i + delta : Math.min(insEnd, Math.max(p, i));
+  return spans.map(sp => ({ ...sp, s: map(sp.s), e: map(sp.e) })).filter(sp => sp.e > sp.s);
+}
+/* Group a wrapped line into the longest possible same-colour runs, so words are
+   still drawn whole wherever the colour doesn't change. */
+function colorRuns(ln, spans, base) {
+  const runs = []; let prev = null;
+  for (let k = 0; k < ln.idx.length; k++) {
+    const e = ln.idx[k];
+    const c = e.i < 0 ? (prev || base) : spanColorAt(spans, e.i, base);
+    if (!runs.length || c !== prev) runs.push({ color: c, a: k, b: k + 1 });
+    else runs[runs.length - 1].b = k + 1;
+    prev = c;
+  }
+  return runs;
 }
 /* Placement of a background image: `fit` shows the whole image (letterboxed on
    the pad colour), the default covers the frame. Pan is a fraction of the
@@ -167,9 +233,10 @@ function drawOverlay(x, doc) {
 function drawText(x, l) {
   x.save();
   x.font = fontString(l); x.letterSpacing = `${l.track * l.size}px`; x.textBaseline = 'alphabetic';
-  const text = l.upper ? l.text.toUpperCase() : l.text;
+  const text = l.upper ? upperKeepLen(l.text) : l.text;
+  const spans = normSpans(l);
   const maxW = l.width * W, lines = wrapLines(x, text, maxW), lh = l.size * l.line;
-  const widths = lines.map(t => x.measureText(t).width);
+  const widths = lines.map(ln => x.measureText(ln.text).width);
   const bw = Math.max(...widths, 1), bh = lines.length * lh;
   const ax = l.x * W, top = l.y * H;
   const left = l.align === 'left' ? ax : l.align === 'right' ? ax - bw : ax - bw / 2;
@@ -180,21 +247,29 @@ function drawText(x, l) {
   if (l.box !== 'none') {
     x.fillStyle = hexA(l.boxColor, l.boxAlpha);
     if (l.box === 'block') { roundRect(x, left - pad * 1.6, top - pad, bw + pad * 3.2, bh + pad * 2, l.size * .12); x.fill(); }
-    else lines.forEach((t, i) => {
+    else lines.forEach((ln, i) => {
       const lw = widths[i]; const lx = l.align === 'left' ? left : l.align === 'right' ? left + bw - lw : left + (bw - lw) / 2;
       const ly = top + i * lh;
       if (l.box === 'pill') { roundRect(x, lx - pad * 1.4, ly + lh * .08, lw + pad * 2.8, lh * .92, lh); x.fill(); }
       else { roundRect(x, lx - pad * .5, ly + lh * .16, lw + pad, lh * .78, 4); x.fill(); }
     });
   }
-  x.fillStyle = l.color; x.textAlign = l.align;
+  /* Runs are drawn left-aligned from the line's own left edge rather than from
+     the layer's alignment anchor. For a single-colour line the two are the same
+     position; doing it this way lets each run carry its own fill. */
+  x.textAlign = 'left';
   const baseOff = lh * 0.5 + l.size * 0.34;
-  lines.forEach((t, i) => {
-    const tx = l.align === 'left' ? left : l.align === 'right' ? left + bw : left + bw / 2;
+  lines.forEach((ln, i) => {
+    const lw = widths[i];
+    const lx = l.align === 'left' ? left : l.align === 'right' ? left + bw - lw : left + (bw - lw) / 2;
     const ty = top + i * lh + baseOff;
-    if (l.outline > 0) { x.save(); x.lineJoin = 'round'; x.lineWidth = l.outline * 2; x.strokeStyle = l.boxColor; x.strokeText(t, tx, ty); x.restore(); }
-    if (l.shadow > 0) { x.shadowColor = `rgba(0,0,0,${l.shadow})`; x.shadowBlur = l.size * .25; x.shadowOffsetY = l.size * .05; }
-    x.fillText(t, tx, ty); x.shadowColor = 'transparent';
+    for (const r of colorRuns(ln, spans, l.color)) {
+      const seg = ln.text.slice(r.a, r.b); if (!seg) continue;
+      const ox = lx + (r.a ? x.measureText(ln.text.slice(0, r.a)).width : 0);
+      if (l.outline > 0) { x.save(); x.lineJoin = 'round'; x.lineWidth = l.outline * 2; x.strokeStyle = l.boxColor; x.strokeText(seg, ox, ty); x.restore(); }
+      if (l.shadow > 0) { x.shadowColor = `rgba(0,0,0,${l.shadow})`; x.shadowBlur = l.size * .25; x.shadowOffsetY = l.size * .05; }
+      x.fillStyle = r.color; x.fillText(seg, ox, ty); x.shadowColor = 'transparent';
+    }
   });
   x.restore();
   return box;
@@ -235,7 +310,7 @@ function requestFonts(doc) { doc.layers.forEach(l => { if (l.type === 'text') en
 const SWATCH = ['#ffffff', '#16150f', '#f1ecdf', '#d9a441', '#e9d9b5', '#7fb3a6', '#0f3b3a', '#2b2b6d', '#b8412e', '#f2c6b6', '#5b6b3a', '#8c8377'];
 const GRADS = [['#0f3b3a', '#16150f'], ['#2b2b6d', '#0b0a1a'], ['#d9a441', '#7a4a12'], ['#e9d9b5', '#c9a27a'], ['#1d1d1d', '#4a4a4a'], ['#7fb3a6', '#16150f'], ['#f2c6b6', '#b8412e'], ['#ffffff', '#d7d2c4']];
 function newText(o = {}) {
-  return Object.assign({ id: uid(), type: 'text', text: 'Caption', font: 'Fraunces', weight: 600, italic: false, upper: false, size: 110, line: 1.02, track: -0.02, width: 0.86, align: 'left', color: '#ffffff', x: 0.07, y: 0.62, box: 'none', boxColor: '#16150f', boxAlpha: 0.65, shadow: 0.35, outline: 0, rot: 0, behind: false }, o);
+  return Object.assign({ id: uid(), type: 'text', text: 'Caption', font: 'Fraunces', weight: 600, italic: false, upper: false, size: 110, line: 1.02, track: -0.02, width: 0.86, align: 'left', color: '#ffffff', spans: [], x: 0.07, y: 0.62, box: 'none', boxColor: '#16150f', boxAlpha: 0.65, shadow: 0.35, outline: 0, rot: 0, behind: false }, o);
 }
 function newRule(o = {}) { return Object.assign({ id: uid(), type: 'rule', x: 0.5, y: 0.6, width: 0.86, thick: 4, color: '#ffffff', alpha: .8 }, o); }
 function newLogo(o = {}) { return Object.assign({ id: uid(), type: 'logo', image: null, x: 0.5, y: 0.1, size: 0.22, alpha: 1, invert: false }, o); }
@@ -588,7 +663,7 @@ bound.push(bindColor('ovColor', () => doc.overlay.color, v => doc.overlay.color 
 bound.push(bindRange('ovOpacity', () => doc.overlay.opacity, v => doc.overlay.opacity = v, v => Math.round(v * 100) + '%'));
 // text props
 $('#tFont').innerHTML = FONTS.map(f => `<option value="${f.n}" style="font-family:'${f.n}'">${f.n}</option>`).join('');
-$('#tText').addEventListener('input', () => { const l = T(); if (l) { l.text = $('#tText').value; renderAll(); renderLayers(); } });
+$('#tText').addEventListener('input', () => { const l = T(); if (l) { const was = l.text; l.text = $('#tText').value; l.spans = remapSpans(l.spans, was, l.text); renderAll(); renderLayers(); } });
 $('#tText').addEventListener('focus', () => { $('#tText')._before = snapshot(); });
 $('#tText').addEventListener('blur', () => { const b = $('#tText')._before; if (b && b !== snapshot()) { undoStack.push(b); redoStack = []; updateUndoBtns(); scheduleSave(); } });
 $('#tFont').addEventListener('change', () => { const l = T(); if (l) { pushUndo(); l.font = $('#tFont').value; const f = FONTS.find(x => x.n === l.font); if (!f.w.includes(l.weight)) l.weight = f.w.includes(700) ? 700 : f.w[f.w.length - 1]; commit(); syncAll(); } });
@@ -603,6 +678,49 @@ const alChips = $('[data-al]').parentElement; bound.push(bindChips(alChips.id ||
 bound.push(bindColor('tColor', () => T()?.color, v => { const l = T(); if (l) l.color = v; }));
 $('#tSwatches').innerHTML = SWATCH.slice(0, 8).map(c => `<button class="sw" style="background:${c};width:16px;height:16px" data-c="${c}"></button>`).join('');
 $('#tSwatches').onclick = e => { const c = e.target.dataset.c, l = T(); if (c && l) { pushUndo(); l.color = c; commit(); syncAll(); } };
+/* Part colour — recolour just the words selected in the text box, so one
+   heading can carry an accent without being split into separate layers. The
+   selection is mirrored into `tSel` because clicking a swatch moves focus, and
+   it is reset whenever the inspector switches to a different layer. */
+let tSel = null, tSelFor = null, tSpanBefore = null;
+const tTextEl = $('#tText');
+function captureSel() {
+  const a = tTextEl.selectionStart, b = tTextEl.selectionEnd;
+  tSel = b > a ? { s: a, e: b } : null;
+  syncSpanUI();
+}
+['keyup', 'mouseup', 'select', 'focus', 'click', 'input'].forEach(ev => tTextEl.addEventListener(ev, captureSel));
+document.addEventListener('selectionchange', () => { if (document.activeElement === tTextEl) captureSel(); });
+function syncSpanUI() {
+  const l = T(), live = !!(l && tSel);
+  $('#tSpanRow').style.opacity = live ? 1 : .45;
+  $('#tSpanColor').disabled = !live; $('#tSpanSwatches').style.pointerEvents = live ? '' : 'none';
+  const n = normSpans(l).length;
+  $('#tSpanClear').disabled = !l || (!live && !n);
+  $('#tSpanHint').textContent = live
+    ? `Colouring “${(l.upper ? upperKeepLen(l.text) : l.text).slice(tSel.s, tSel.e)}”.`
+    : n ? `${n} coloured ${n === 1 ? 'part' : 'parts'} on this layer. Select words above to change them, or Clear to reset all.`
+      : 'Select words in the box above, then pick a colour to accent just that part.';
+}
+function applySpan(c) {
+  const l = T(); if (!l || !tSel) return;
+  l.spans = clipSpans(normSpans(l), tSel.s, tSel.e).concat([{ s: tSel.s, e: tSel.e, color: c }]).sort((a, b) => a.s - b.s);
+  renderAll(); renderLayers(); syncSpanUI();
+  tTextEl.focus(); tTextEl.setSelectionRange(tSel.s, tSel.e);
+}
+$('#tSpanSwatches').innerHTML = SWATCH.slice(0, 8).map(c => `<button class="sw" style="background:${c};width:16px;height:16px" data-c="${c}" title="${c}"></button>`).join('');
+// Hold the selection: a mousedown on these controls would otherwise blur the textarea.
+['#tSpanSwatches', '#tSpanClear'].forEach(s => $(s).addEventListener('mousedown', e => e.preventDefault()));
+$('#tSpanSwatches').onclick = e => { const c = e.target.dataset.c; if (c && tSel) { pushUndo(); applySpan(c); scheduleSave(); } };
+$('#tSpanColor').addEventListener('input', e => { if (!tSpanBefore) tSpanBefore = snapshot(); applySpan(e.target.value); });
+$('#tSpanColor').addEventListener('change', () => { if (tSpanBefore) { undoStack.push(tSpanBefore); redoStack = []; updateUndoBtns(); tSpanBefore = null; scheduleSave(); } });
+$('#tSpanClear').onclick = () => {
+  const l = T(); if (!l) return;
+  pushUndo();
+  l.spans = tSel ? clipSpans(normSpans(l), tSel.s, tSel.e) : [];
+  commit(); renderLayers(); syncSpanUI();
+  if (tSel) { tTextEl.focus(); tTextEl.setSelectionRange(tSel.s, tSel.e); }
+};
 const boxChips = $('[data-box]').parentElement; bound.push(bindChips(boxChips.id || (boxChips.id = 'boxChips'), 'box', () => T()?.box, v => { const l = T(); if (l) l.box = v; }));
 bound.push(bindColor('tBoxColor', () => T()?.boxColor, v => { const l = T(); if (l) l.boxColor = v; }));
 bound.push(bindRange('tBoxAlpha', () => T()?.boxAlpha, v => { const l = T(); if (l) l.boxAlpha = v; }));
@@ -661,7 +779,11 @@ function renderLayers() {
 }
 function syncProps() {
   const l = L(); $('#propText').hidden = !(l && l.type === 'text'); $('#propRule').hidden = !(l && l.type === 'rule'); $('#propLogo').hidden = !(l && l.type === 'logo');
-  if (l && l.type === 'text') { $('#tText').value = l.text; $('#tFont').value = l.font; }
+  if (l && l.type === 'text') {
+    $('#tText').value = l.text; $('#tFont').value = l.font;
+    if (tSelFor !== l.id) { tSel = null; tSelFor = l.id; }   // a stale selection belongs to the old layer
+    syncSpanUI();
+  }
   if (l && l.type === 'logo') $('#lImage').value = l.image || '';
   bound.forEach(b => b._sync());
 }

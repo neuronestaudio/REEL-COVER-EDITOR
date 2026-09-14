@@ -10,6 +10,13 @@ artwork, double-click text to edit. Layers can be text, badges, rules or logos, 
 weight, tracking, leading, box style, outline, shadow and rotation. Six starting templates.
 Guides mark the 3:4 profile-grid crop and the zone Instagram's reel UI covers.
 
+**Part colour** — select any words inside a caption and give just those a different colour, so
+one heading can carry an accent without being split into separate layers. Select in the text
+box, then pick from **Part colour**; **Clear** returns the selection to the layer colour, or
+resets the whole layer when nothing is selected. The colour is stored as a range over the text
+rather than baked into it, so it follows the words as the caption is edited, and survives word
+wrap, CAPS and re-alignment.
+
 **Backgrounds** — tile picker of every image in the library, plus upload, or drag a file
 anywhere onto the canvas. Drag the canvas to pan, scroll to zoom, or use Fill / Fit / Reset.
 Also solid colours, gradients and six generated textures.

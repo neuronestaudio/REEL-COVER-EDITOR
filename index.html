@@ -388,6 +388,11 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
         <button class="chip" data-al="left">Left</button><button class="chip" data-al="center">Centre</button><button class="chip" data-al="right">Right</button>
       </div></div>
       <div class="row"><label>Colour</label><div class="ctl"><input type="color" id="tColor"><div class="swatches" id="tSwatches"></div></div></div>
+      <div class="row" id="tSpanRow"><label>Part colour</label><div class="ctl"><input type="color" id="tSpanColor"><div class="swatches" id="tSpanSwatches"></div></div></div>
+      <div class="notice" style="margin:-2px 0 10px;display:flex;align-items:center;gap:8px">
+        <span id="tSpanHint" style="flex:1"></span>
+        <button class="small ghost" id="tSpanClear" title="Give the selection back the layer colour">Clear</button>
+      </div>
       <div class="row"><label>Box</label><div class="ctl chips">
         <button class="chip" data-box="none">None</button><button class="chip" data-box="pill">Pill</button><button class="chip" data-box="block">Block</button><button class="chip" data-box="highlight">Highlight</button>
       </div></div>
