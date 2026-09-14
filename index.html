@@ -28,6 +28,8 @@ button:hover{border-color:var(--line-2);background:#302c1e}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
 button.primary:hover{background:#e6b352}
+button.go{background:var(--good);color:#0d2413;border-color:var(--good);font-weight:700}
+button.go:hover{background:#93d3a1;border-color:#93d3a1}
 button.ghost{background:transparent;border-color:transparent;color:var(--muted)}
 button.ghost:hover{color:var(--text);background:var(--raised);border-color:var(--line)}
 button.small{padding:3px 8px;font-size:12px}
@@ -254,7 +256,7 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
 <section class="view active" id="view-editor">
   <aside class="left">
     <div class="sec">
-      <h3>Covers <span class="acts"><button class="small" id="btnBackup" title="Download every cover and image as one JSON file">Back up</button><button class="small" id="btnRestore" title="Load a backup file">Restore</button><button class="small" id="btnNew">+ New</button></span></h3>
+      <h3>Covers <span class="acts"><button class="small" id="btnBackup" title="Download every cover and image as one JSON file">Back up</button><button class="small" id="btnRestore" title="Load a backup file">Restore</button><button class="small go" id="btnNew">+ New</button></span></h3>
       <div class="covers" id="coverList"></div>
     </div>
     <div class="sec">
