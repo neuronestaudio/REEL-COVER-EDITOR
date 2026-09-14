@@ -18,7 +18,9 @@ Also solid colours, gradients and six generated textures.
 layer row, or `B` on the selected layer.
 
 **Profile grid** — phone mock of the Reels tab showing covers side by side, drag to reorder,
-toggle to the 3:4 grid crop to check captions survive it.
+toggle to the 3:4 grid crop to check captions survive it. Every part of the profile header is
+editable — handle, name, category, bio, link, counts, "followed by" line and avatar — so the
+mock can be set to whichever account the covers are for.
 
 **Cutout & backgrounds** — on-device subject segmentation (MediaPipe Selfie Segmentation,
 bundled in `mp/`, nothing uploaded), edge/feather/shrink controls, and background swapping.

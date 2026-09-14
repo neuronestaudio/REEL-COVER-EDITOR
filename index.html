@@ -1,3 +1,10 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="WYSIWYG designer for 1080x1920 Instagram reel covers — captions, cutouts, background swapping and PNG export.">
+<meta name="color-scheme" content="dark">
 <title>Reel Cover Studio</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2316150f'/%3E%3Crect x='9' y='6' width='14' height='20' rx='2' fill='none' stroke='%23d9a441' stroke-width='2'/%3E%3Cpath d='M13 12h6M13 16h6M13 20h3' stroke='%23d9a441' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Instrument+Serif:ital@0;1&family=Bebas+Neue&family=Anton&family=Syne:wght@400;600;800&family=Unbounded:wght@400;700;900&family=Caveat:wght@500;700&display=swap">
@@ -13,6 +20,7 @@
   --font-display:"Fraunces",Georgia,serif;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--ink);color:var(--text);font:14px/1.45 var(--font-ui);height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;background:var(--raised);border:1px solid var(--line);border-radius:var(--r);padding:6px 10px;line-height:1.2}
@@ -133,13 +141,21 @@ aside.right{border-left:1px solid var(--line)}
 .phone .sb{display:flex;justify-content:space-between;padding:12px 26px 4px;font-size:13px;font-weight:600}
 .phone .top{display:flex;align-items:center;justify-content:space-between;padding:6px 14px;font-weight:700;font-size:18px}
 .phone .prof{display:flex;gap:18px;align-items:center;padding:6px 14px}
-.phone .av{width:76px;height:76px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#3b3627,#16150f);display:grid;place-items:center;font-family:var(--font-display);font-size:22px;color:var(--accent);border:2px solid #333}
+.phone .av{width:76px;height:76px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#3b3627,#16150f);display:grid;place-items:center;font-family:var(--font-display);font-size:26px;color:var(--accent);border:2px solid #333;padding:0;overflow:hidden;cursor:pointer;flex:0 0 76px}
+.phone .av img{width:100%;height:100%;object-fit:cover;display:block}
+.phone .av:hover{border-color:var(--accent)}
 .phone .stats{display:flex;gap:18px;flex:1;justify-content:space-around;text-align:center}
 .phone .stats b{display:block;font-size:16px}
 .phone .stats span{font-size:12px;color:#ccc}
 .phone .bio{padding:2px 14px 8px;font-size:13px;line-height:1.35}
 .phone .bio b{display:block}
-.phone .bio i{color:#9fb8b0;font-style:normal}
+.phone .bio .cat{display:block;color:#a8a8a8}
+.phone .bio a{display:block;color:#8fb6d9;text-decoration:none;margin-top:2px}
+.phone .bio a::before{content:"🔗 ";filter:grayscale(1)}
+.phone .followed{display:flex;align-items:center;gap:7px;padding:0 14px 10px;font-size:12px;color:#a8a8a8;line-height:1.3}
+.phone .followed .faces{display:flex}
+.phone .followed .faces i{width:18px;height:18px;border-radius:50%;border:1.5px solid #000;margin-right:-6px;display:block}
+.phone .followed b{color:#fff;font-weight:600}
 .phone .btns{display:flex;gap:6px;padding:0 14px 10px}
 .phone .btns div{flex:1;background:#262626;border-radius:8px;text-align:center;font-size:13px;font-weight:600;padding:7px}
 .phone .ptabs{display:flex;border-top:1px solid #262626}
@@ -201,6 +217,8 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
+</head>
+<body>
 
 <div id="app">
 <header>
@@ -402,12 +420,13 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
   <div id="gridStage">
     <div class="phone">
       <div class="sb"><span>9:41</span><span>●●● ⌔ ▮</span></div>
-      <div class="top"><span id="phHandle">neuronesthub</span><span style="font-weight:400;letter-spacing:2px">+ ≡</span></div>
+      <div class="top"><span id="phHandle"></span><span style="font-weight:400;letter-spacing:2px">+ ≡</span></div>
       <div class="prof">
-        <div class="av" id="phAvatar">N</div>
-        <div class="stats"><div><b id="phPosts">0</b><span>posts</span></div><div><b>12.4K</b><span>followers</span></div><div><b>212</b><span>following</span></div></div>
+        <button class="av" id="phAvatar" title="Upload a profile picture"></button>
+        <div class="stats"><div><b id="phPosts">0</b><span>posts</span></div><div><b id="phFollowers">0</b><span>followers</span></div><div><b id="phFollowing">0</b><span>following</span></div></div>
       </div>
-      <div class="bio"><b id="phName">NeuroNest</b><span id="phBio">Sound, engineered for the nervous system.<br><i>neuronesthub.org</i></span></div>
+      <div class="bio"><b id="phName"></b><span class="cat" id="phCat"></span><span id="phBio"></span><a id="phLink" href="#" onclick="return false"></a></div>
+      <div class="followed" id="phFollowedBy"></div>
       <div class="btns"><div>Follow</div><div>Message</div><div style="flex:0 0 40px">▾</div></div>
       <div class="ptabs"><div>⊞ GRID</div><div class="on">▶ REELS</div><div>◎ TAGGED</div></div>
       <div class="igrid" id="igrid"></div>
@@ -416,9 +435,18 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
   <aside class="right">
     <div class="sec">
       <h3>Profile mock</h3>
-      <div class="row"><label for="gHandle">Handle</label><div class="ctl"><input type="text" id="gHandle" value="neuronesthub"></div></div>
-      <div class="row"><label for="gName">Name</label><div class="ctl"><input type="text" id="gName" value="NeuroNest"></div></div>
-      <div class="row"><label for="gBio">Bio</label><div class="ctl"><input type="text" id="gBio" value="Sound, engineered for the nervous system."></div></div>
+      <div class="row"><label for="gHandle">Handle</label><div class="ctl"><input type="text" id="gHandle"></div></div>
+      <div class="row"><label for="gName">Name</label><div class="ctl"><input type="text" id="gName"></div></div>
+      <div class="row"><label for="gCat">Category</label><div class="ctl"><input type="text" id="gCat" placeholder="Coach"></div></div>
+      <div class="row" style="align-items:flex-start"><label for="gBio">Bio</label><div class="ctl"><textarea id="gBio" rows="3" style="min-height:52px"></textarea></div></div>
+      <div class="row"><label for="gLink">Link</label><div class="ctl"><input type="text" id="gLink"></div></div>
+      <div class="row"><label>Counts</label><div class="ctl">
+        <input type="text" id="gPosts" title="Posts" style="text-align:center">
+        <input type="text" id="gFollowers" title="Followers" style="text-align:center">
+        <input type="text" id="gFollowing" title="Following" style="text-align:center">
+      </div></div>
+      <div class="row"><label for="gFollowedBy">Followed by</label><div class="ctl"><input type="text" id="gFollowedBy" placeholder="leave empty to hide"></div></div>
+      <div class="row"><label>Avatar</label><div class="ctl"><button class="small" id="gAvatar">Upload picture</button><button class="small ghost" id="gAvatarClear">Clear</button></div></div>
       <div class="row"><label>Tile shape</label><div class="ctl chips">
         <button class="chip" id="gShape916" aria-pressed="true">Reels tab 9:16</button>
         <button class="chip" id="gShape34">Grid 3:4 crop</button>
@@ -505,3 +533,5 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
 <script src="vendor/jszip.min.js"></script>
 <script src="mp/selfie_segmentation.js"></script>
 <script src="app.js"></script>
+</body>
+</html>

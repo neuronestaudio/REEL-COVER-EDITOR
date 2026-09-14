@@ -251,29 +251,29 @@ function baseDoc(name) {
 }
 const TEMPLATES = [
   { name: 'Quiet signal', make() { const d = baseDoc('Quiet signal'); d.bg.scale = 1.05; d.bg.y = -0.1; d.overlay = { type: 'bottom', color: '#0b0a07', opacity: 0.8 }; d.grain = 0.08;
-    d.layers = [newText({ text: 'NEURONEST · EP 04', font: 'JetBrains Mono', weight: 500, size: 30, track: 0.18, upper: true, x: 0.08, y: 0.655, color: '#d9a441', shadow: 0 }),
-      newText({ text: 'Why your brain can’t switch off at night', font: 'Fraunces', weight: 300, size: 118, line: 0.98, track: -0.03, x: 0.08, y: 0.69, width: 0.84 }),
-      newText({ text: '3 min · sound science', font: 'Manrope', weight: 600, size: 32, x: 0.08, y: 0.905, color: '#f1ecdf', box: 'pill', boxColor: '#16150f', boxAlpha: .7, shadow: 0 })]; return d; } },
+    d.layers = [newText({ text: 'EPISODE 04', font: 'JetBrains Mono', weight: 500, size: 30, track: 0.18, upper: true, x: 0.08, y: 0.655, color: '#d9a441', shadow: 0 }),
+      newText({ text: 'The thing nobody tells you about starting over', font: 'Fraunces', weight: 300, size: 118, line: 0.98, track: -0.03, x: 0.08, y: 0.69, width: 0.84 }),
+      newText({ text: '3 min watch', font: 'Manrope', weight: 600, size: 32, x: 0.08, y: 0.905, color: '#f1ecdf', box: 'pill', boxColor: '#16150f', boxAlpha: .7, shadow: 0 })]; return d; } },
   { name: 'Amber cutout', make() { const d = baseDoc('Amber cutout'); d.bg = { ...d.bg, type: 'solid', color: '#e9d9b5' }; d.subject = { ...d.subject, on: true, scale: 0.66, y: 0.99, shadow: 0.45 }; d.overlay = { type: 'none', color: '#000', opacity: 0 };
     d.layers = [newText({ text: 'FOCUS', font: 'Bebas Neue', weight: 400, size: 520, line: 0.85, track: -0.01, align: 'center', x: 0.5, y: 0.19, color: '#16150f', shadow: 0, behind: true, width: 1 }),
-      newText({ text: 'The 40 Hz question', font: 'Fraunces', weight: 600, italic: true, size: 64, align: 'center', x: 0.5, y: 0.88, color: '#16150f', shadow: 0 }),
+      newText({ text: 'A question worth sitting with', font: 'Fraunces', weight: 600, italic: true, size: 64, align: 'center', x: 0.5, y: 0.88, color: '#16150f', shadow: 0 }),
       newText({ text: 'PART 01', font: 'JetBrains Mono', size: 28, track: 0.2, align: 'center', x: 0.5, y: 0.93, color: '#b8412e', shadow: 0 })]; return d; } },
   { name: 'Mono editorial', make() { const d = baseDoc('Mono editorial'); d.bg = { ...d.bg, sat: 0, bright: 0.9, scale: 1.1 }; d.overlay = { type: 'both', color: '#000000', opacity: 0.55 }; d.grain = 0.14;
     d.layers = [newRule({ y: 0.72, width: 0.3, x: 0.2, thick: 3 }),
-      newText({ text: 'Silence is a frequency', font: 'Cormorant Garamond', weight: 400, italic: true, size: 136, line: 0.95, x: 0.06, y: 0.74, width: 0.9, color: '#f1ecdf', shadow: .2 }),
+      newText({ text: 'Stillness is a skill', font: 'Cormorant Garamond', weight: 400, italic: true, size: 136, line: 0.95, x: 0.06, y: 0.74, width: 0.9, color: '#f1ecdf', shadow: .2 }),
       newText({ text: 'No. 12 — On stillness', font: 'JetBrains Mono', size: 30, track: 0.12, upper: true, x: 0.06, y: 0.14, color: '#f1ecdf', shadow: 0 })]; return d; } },
   { name: 'Deep teal', make() { const d = baseDoc('Deep teal'); d.bg = { ...d.bg, type: 'gradient', g1: '#0f3b3a', g2: '#0a0c12', angle: 170 }; d.subject = { ...d.subject, on: true, scale: 0.6, y: 1.0, shadow: 0.7 }; d.overlay = { type: 'bottom', color: '#0a0c12', opacity: 0.5 }; d.grain = 0.1;
     d.layers = [newText({ text: 'Your nervous system has a volume knob', font: 'Syne', weight: 800, size: 112, line: 1.0, track: -0.03, upper: true, x: 0.07, y: 0.08, width: 0.86, color: '#f1ecdf', shadow: 0 }),
       newText({ text: 'here’s how to turn it down', font: 'Caveat', weight: 700, size: 76, x: 0.07, y: 0.4, color: '#7fb3a6', rot: -4, shadow: 0 }),
-      newText({ text: 'NEURONEST', font: 'JetBrains Mono', size: 30, track: 0.28, align: 'center', x: 0.5, y: 0.94, color: '#7fb3a6', shadow: 0 })]; return d; } },
+      newText({ text: '@YOURHANDLE', font: 'JetBrains Mono', size: 30, track: 0.28, align: 'center', x: 0.5, y: 0.94, color: '#7fb3a6', shadow: 0 })]; return d; } },
   { name: 'Poster stack', make() { const d = baseDoc('Poster stack'); d.bg = { ...d.bg, type: 'texture', tex: 'rings', tc1: '#16150f', tc2: '#d9a441', seed: 21 }; d.subject = { ...d.subject, on: true, scale: 0.58, x: 0.56, y: 1.02, shadow: 0.6 }; d.overlay = { type: 'none', color: '#000', opacity: 0 };
-    d.layers = [newText({ text: 'SLEEP\nBETTER\nTONIGHT', font: 'Anton', weight: 400, size: 250, line: 0.88, track: 0, x: 0.06, y: 0.07, width: 0.9, color: '#f1ecdf', shadow: 0, behind: true }),
-      newText({ text: '5 sounds, ranked', font: 'Manrope', weight: 700, size: 40, x: 0.06, y: 0.9, color: '#16150f', box: 'highlight', boxColor: '#d9a441', boxAlpha: 1, shadow: 0 })]; return d; } },
+    d.layers = [newText({ text: 'START\nBEFORE\nYOU\u2019RE READY', font: 'Anton', weight: 400, size: 250, line: 0.88, track: 0, x: 0.06, y: 0.07, width: 0.9, color: '#f1ecdf', shadow: 0, behind: true }),
+      newText({ text: '5 rules, ranked', font: 'Manrope', weight: 700, size: 40, x: 0.06, y: 0.9, color: '#16150f', box: 'highlight', boxColor: '#d9a441', boxAlpha: 1, shadow: 0 })]; return d; } },
   { name: 'Paper note', make() { const d = baseDoc('Paper note'); d.bg = { ...d.bg, type: 'texture', tex: 'paper', tc1: '#f1ecdf', tc2: '#d9a441', seed: 3 }; d.subject = { ...d.subject, on: true, scale: 0.5, x: 0.5, y: 0.7, shadow: 0.35 }; d.overlay = { type: 'none', color: '#000', opacity: 0 };
     d.layers = [newText({ text: 'field notes', font: 'Instrument Serif', weight: 400, italic: true, size: 96, align: 'center', x: 0.5, y: 0.1, color: '#16150f', shadow: 0 }),
-      newText({ text: 'What binaural beats actually do (and don’t)', font: 'Fraunces', weight: 700, size: 78, line: 1.05, track: -0.02, align: 'center', x: 0.5, y: 0.74, width: 0.8, color: '#16150f', shadow: 0 }),
+      newText({ text: 'What actually changed (and what didn’t)', font: 'Fraunces', weight: 700, size: 78, line: 1.05, track: -0.02, align: 'center', x: 0.5, y: 0.74, width: 0.8, color: '#16150f', shadow: 0 }),
       newRule({ y: 0.705, width: 0.12, thick: 5, color: '#b8412e', alpha: 1 }),
-      newText({ text: 'neuronesthub.org', font: 'JetBrains Mono', size: 28, track: 0.1, align: 'center', x: 0.5, y: 0.93, color: '#8c8377', shadow: 0 })]; return d; } },
+      newText({ text: 'yoursite.com', font: 'JetBrains Mono', size: 28, track: 0.1, align: 'center', x: 0.5, y: 0.93, color: '#8c8377', shadow: 0 })]; return d; } },
 ];
 
 /* ---------------- storage ----------------
@@ -351,7 +351,19 @@ const store = {
 let covers = [];           // [{id,name,updatedAt,createdAt,doc,versions:[{at,doc}]}]
 let doc = null;            // live document
 let sel = null;            // selected layer id | '__subject' | null
-let settings = { gridOrder: [], handle: 'neuronesthub', name: 'NeuroNest', bio: 'Sound, engineered for the nervous system.', shape: '916' };
+/* The profile mock defaults to the account these covers are being made for.
+   Every field is editable, so the same tool works for any client. */
+const PROFILE_DEFAULTS = {
+  handle: 'harrison.saito',
+  name: 'Harrison Saito | Men\u2019s Coach',
+  category: 'Coach',
+  bio: 'I help burnt out men feel seen & rebuild self-worth.\nFrom people pleaser to self-led\nTeacher \u2022 Buddhist \u2022 Karate (17+\u2026 more',
+  link: 'www.harrisonsaito.com.au/return-to-self',
+  posts: '72', followers: '414', following: '211',
+  followedBy: 'harrison.saito.private, nattynatman, and takyumi99',
+  avatar: null,
+};
+let settings = { gridOrder: [], shape: '916', ...PROFILE_DEFAULTS };
 let undoStack = [], redoStack = [];
 let zoomMul = 1, boxes = {};
 let saveTimer = null;
@@ -741,12 +753,24 @@ function gridOrdered() { const inGrid = (settings.gridOrder || []).map(id => cov
 let gridDrag = null;
 function renderGrid() {
   if (!$('#view-grid').classList.contains('active')) return;
-  $('#phHandle').textContent = settings.handle; $('#phName').textContent = settings.name; $('#phBio').innerHTML = escapeHtml(settings.bio) + '<br><i>neuronesthub.org</i>'; $('#phAvatar').textContent = (settings.name || 'N')[0].toUpperCase();
-  $('#gHandle').value = settings.handle; $('#gName').value = settings.name; $('#gBio').value = settings.bio;
+  $('#phHandle').textContent = settings.handle;
+  $('#phName').textContent = settings.name;
+  $('#phCat').textContent = settings.category || '';
+  $('#phCat').hidden = !settings.category;
+  $('#phBio').innerHTML = escapeHtml(settings.bio || '').replace(/\n/g, '<br>');
+  const lk = $('#phLink'); lk.textContent = settings.link || ''; lk.hidden = !settings.link;
+  const fb = $('#phFollowedBy');
+  if (settings.followedBy) fb.innerHTML = `<span class="faces"><i style="background:#5b6b3a"></i><i style="background:#b8412e"></i><i style="background:#2b2b6d"></i></span><span>Followed by <b>${escapeHtml(settings.followedBy)}</b></span>`;
+  else fb.innerHTML = '';
+  const av = $('#phAvatar'), avAsset = settings.avatar && assets[settings.avatar];
+  av.innerHTML = ''; if (avAsset) { const i = new Image(); i.src = avAsset.url; i.alt = ''; av.appendChild(i); } else av.textContent = (settings.name || '?').trim()[0].toUpperCase();
+  $('#phFollowers').textContent = settings.followers || '0';
+  $('#phFollowing').textContent = settings.following || '0';
+  PROFILE_FIELDS.forEach(([id, key]) => { const el = $('#' + id); if (el && document.activeElement !== el) el.value = settings[key] || ''; });
   $('#gShape916').setAttribute('aria-pressed', settings.shape !== '34'); $('#gShape34').setAttribute('aria-pressed', settings.shape === '34');
   const ig = $('#igrid'); ig.className = 'igrid' + (settings.shape === '34' ? ' crop34' : ''); ig.innerHTML = '';
   const order = (settings.gridOrder || []).map(id => covers.find(c => c.id === id)).filter(Boolean);
-  $('#phPosts').textContent = order.length;
+  $('#phPosts').textContent = settings.posts || order.length;
   const n = Math.max(9, Math.ceil(order.length / 3) * 3);
   for (let i = 0; i < n; i++) {
     const t = document.createElement('div'); t.className = 'tile'; const r = order[i];
@@ -778,7 +802,10 @@ function shiftGrid(id, dir) { const o = settings.gridOrder; const i = o.indexOf(
 let settingsTimer; function saveSettingsSoon() { clearTimeout(settingsTimer); settingsTimer = setTimeout(() => store.saveSettings(settings).catch(() => {}), 600); }
 $('#gAddAll').onclick = () => { settings.gridOrder = [...new Set([...settings.gridOrder, ...covers.sort((a, b) => b.updatedAt - a.updatedAt).map(c => c.id)])]; saveSettingsSoon(); renderGrid(); };
 $('#gClear').onclick = () => { settings.gridOrder = []; saveSettingsSoon(); renderGrid(); };
-['gHandle', 'gName', 'gBio'].forEach(id => $('#' + id).addEventListener('input', () => { settings.handle = $('#gHandle').value; settings.name = $('#gName').value; settings.bio = $('#gBio').value; saveSettingsSoon(); renderGrid(); }));
+const PROFILE_FIELDS = [['gHandle', 'handle'], ['gName', 'name'], ['gCat', 'category'], ['gBio', 'bio'], ['gLink', 'link'], ['gPosts', 'posts'], ['gFollowers', 'followers'], ['gFollowing', 'following'], ['gFollowedBy', 'followedBy']];
+PROFILE_FIELDS.forEach(([id, key]) => $('#' + id).addEventListener('input', e => { settings[key] = e.target.value; saveSettingsSoon(); renderGrid(); }));
+$('#gAvatar').onclick = () => pickFile(async f => { const rec = await store.putAsset(f, 'avatar', 'profile picture'); settings.avatar = rec.id; saveSettingsSoon(); renderGrid(); });
+$('#gAvatarClear').onclick = async () => { const id = settings.avatar; settings.avatar = null; saveSettingsSoon(); renderGrid(); if (id) await store.deleteAsset(id); };
 $('#gShape916').onclick = () => { settings.shape = '916'; saveSettingsSoon(); renderGrid(); };
 $('#gShape34').onclick = () => { settings.shape = '34'; saveSettingsSoon(); renderGrid(); };
 
@@ -878,7 +905,11 @@ document.fonts.addEventListener('loadingdone', () => { renderAll(); renderCoverL
 (async () => {
   setStatus('connecting…');
   await store.init();
-  try { settings = { ...settings, ...(await store.getSettings()) }; settings.gridOrder = settings.gridOrder || []; } catch {}
+  try {
+    settings = { ...settings, ...(await store.getSettings()) }; settings.gridOrder = settings.gridOrder || [];
+    if (settings.handle === 'neuronesthub' && !settings.profileEdited) Object.assign(settings, PROFILE_DEFAULTS); // drop the old placeholder profile
+    settings.profileEdited = true;
+  } catch {}
   try { covers = await store.listCovers(); } catch (e) { console.warn(e); covers = []; }
   refreshAssetSelects(); renderTemplates();
   if (covers.length) loadDoc([...covers].sort((a, b) => b.updatedAt - a.updatedAt)[0].doc);
