@@ -10,7 +10,7 @@ const fmtTime = t => { const d = new Date(t), now = new Date(); const tm = d.toL
 
 /* ---------------- fonts ---------------- */
 const FONTS = [
-  { n: 'Fraunces', w: [300, 400, 600, 700, 900], i: true },
+  { n: 'Fraunces', w: [300, 400, 500, 600, 700, 900], i: true },
   { n: 'Cormorant Garamond', w: [400, 600, 700], i: true },
   { n: 'Playfair Display', w: [400, 700, 900], i: true },
   { n: 'Instrument Serif', w: [400], i: true },
@@ -55,6 +55,29 @@ const BUILTIN = {
   still10: { id: 'still10', kind: 'photo', name: 'Seated, hands in lap', url: 'assets/stills/still-10.jpg', builtin: true, still: true },
   still11: { id: 'still11', kind: 'photo', name: 'Empty chair, cushion', url: 'assets/stills/still-11.jpg', builtin: true, still: true },
   still12: { id: 'still12', kind: 'photo', name: 'Candlelight, match', url: 'assets/stills/still-12.jpg', builtin: true, still: true },
+  // Return to Self static set (16 Sep 2026): the plate from each of Nathan's 18 videos, photo top, ink below. Not in the 72-batch pool.
+  rtsA11: { id: 'rtsA11', kind: 'photo', name: 'Static A1.1, puppet', url: 'assets/statics/rts-a1-1.jpg', builtin: true, rts: true },
+  rtsA12: { id: 'rtsA12', kind: 'photo', name: 'Static A1.2, balcony close', url: 'assets/statics/rts-a1-2.jpg', builtin: true, rts: true },
+  rtsA13: { id: 'rtsA13', kind: 'photo', name: 'Static A1.3, mask', url: 'assets/statics/rts-a1-3.jpg', builtin: true, rts: true },
+  rtsA14: { id: 'rtsA14', kind: 'photo', name: 'Static A1.4, balcony', url: 'assets/statics/rts-a1-4.jpg', builtin: true, rts: true },
+  rtsA21: { id: 'rtsA21', kind: 'photo', name: 'Static A2.1, bedside', url: 'assets/statics/rts-a2-1.jpg', builtin: true, rts: true },
+  rtsA22: { id: 'rtsA22', kind: 'photo', name: 'Static A2.2, dojo close', url: 'assets/statics/rts-a2-2.jpg', builtin: true, rts: true },
+  rtsA23: { id: 'rtsA23', kind: 'photo', name: 'Static A2.3, father photo', url: 'assets/statics/rts-a2-3.jpg', builtin: true, rts: true },
+  rtsA31: { id: 'rtsA31', kind: 'photo', name: 'Static A3.1, dojo', url: 'assets/statics/rts-a3-1.jpg', builtin: true, rts: true },
+  rtsA32: { id: 'rtsA32', kind: 'photo', name: 'Static A3.2, dojo', url: 'assets/statics/rts-a3-2.jpg', builtin: true, rts: true },
+  rtsA33: { id: 'rtsA33', kind: 'photo', name: 'Static A3.3, dojo', url: 'assets/statics/rts-a3-3.jpg', builtin: true, rts: true },
+  rtsC1: { id: 'rtsC1', kind: 'photo', name: 'Static C1, dojo close', url: 'assets/statics/rts-c1.jpg', builtin: true, rts: true },
+  rtsC2: { id: 'rtsC2', kind: 'photo', name: 'Static C2, bedside band', url: 'assets/statics/rts-c2.jpg', builtin: true, rts: true },
+  rtsC3: { id: 'rtsC3', kind: 'photo', name: 'Static C3, glass room', url: 'assets/statics/rts-c3.jpg', builtin: true, rts: true },
+  rtsC4: { id: 'rtsC4', kind: 'photo', name: 'Static C4, balcony close', url: 'assets/statics/rts-c4.jpg', builtin: true, rts: true },
+  rtsC5: { id: 'rtsC5', kind: 'photo', name: 'Static C5, dojo', url: 'assets/statics/rts-c5.jpg', builtin: true, rts: true },
+  rtsC6: { id: 'rtsC6', kind: 'photo', name: 'Static C6, dojo', url: 'assets/statics/rts-c6.jpg', builtin: true, rts: true },
+  rtsC7: { id: 'rtsC7', kind: 'photo', name: 'Static C7, temple ink', url: 'assets/statics/rts-c7.jpg', builtin: true, rts: true },
+  rtsC8: { id: 'rtsC8', kind: 'photo', name: 'Static C8, glass room', url: 'assets/statics/rts-c8.jpg', builtin: true, rts: true },
+  // Harrison's marks, for the signature strip
+  rtsMark: { id: 'rtsMark', kind: 'logo', name: 'Harrison ensō mark, white', url: 'assets/brand/mark-s-white.png', builtin: true },
+  rtsShinbukan: { id: 'rtsShinbukan', kind: 'logo', name: 'Shinbukan crest', url: 'assets/brand/mark-shinbukan.png', builtin: true },
+  rtsSeizanji: { id: 'rtsSeizanji', kind: 'logo', name: 'Seizanji crests', url: 'assets/brand/mark-seizanji.png', builtin: true },
 };
 let assets = { ...BUILTIN };
 const imgCache = {};
@@ -361,6 +384,9 @@ const TEMPLATES = [
   { name: 'Poster stack', make() { const d = baseDoc('Poster stack'); d.bg = { ...d.bg, type: 'texture', tex: 'rings', tc1: '#16150f', tc2: '#d9a441', seed: 21 }; d.subject = { ...d.subject, on: true, scale: 0.58, x: 0.56, y: 1.02, shadow: 0.6 }; d.overlay = { type: 'none', color: '#000', opacity: 0 };
     d.layers = [newText({ text: 'START\nBEFORE\nYOU\u2019RE READY', font: 'Anton', weight: 400, size: 250, line: 0.88, track: 0, x: 0.06, y: 0.07, width: 0.9, color: '#f1ecdf', shadow: 0, behind: true }),
       newText({ text: '5 rules, ranked', font: 'Manrope', weight: 700, size: 40, x: 0.06, y: 0.9, color: '#16150f', box: 'highlight', boxColor: '#d9a441', boxAlpha: 1, shadow: 0 })]; return d; } },
+  { name: 'Return to Self static', make() { const d = buildStaticDoc({ id: 'RTS', name: 'static', layout: 'cover', bg: 'rtsA32', kicker: 'Return to Self',
+      head: 'Willpower. Discipline. Starting over. And it still doesn\u2019t stick.', sub: 'You\u2019re not weak. You\u2019re fighting the wrong thing.', cta: 'Message me' });
+    d.name = 'Return to Self static'; delete d.rts; return d; } },
   { name: 'Paper note', make() { const d = baseDoc('Paper note'); d.bg = { ...d.bg, type: 'texture', tex: 'paper', tc1: '#f1ecdf', tc2: '#d9a441', seed: 3 }; d.subject = { ...d.subject, on: true, scale: 0.5, x: 0.5, y: 0.7, shadow: 0.35 }; d.overlay = { type: 'none', color: '#000', opacity: 0 };
     d.layers = [newText({ text: 'field notes', font: 'Instrument Serif', weight: 400, italic: true, size: 96, align: 'center', x: 0.5, y: 0.1, color: '#16150f', shadow: 0 }),
       newText({ text: 'What actually changed (and what didn’t)', font: 'Fraunces', weight: 700, size: 78, line: 1.05, track: -0.02, align: 'center', x: 0.5, y: 0.74, width: 0.8, color: '#16150f', shadow: 0 }),
@@ -1584,6 +1610,81 @@ async function seedDemoSet() {
   return true;
 }
 
+
+/* ---------------- Return to Self static set ----------------
+   The 18 statics cut from Nathan's 16 Sep videos, one per video, rebuilt here
+   as ordinary editable covers so the copy, plates and marks are material to
+   remix. Same look as the reel covers — white Fraunces caps, an italic sub-line,
+   one vermilion rule — with a signature strip: ensō mark, name, role, and the
+   Shinbukan and Seizanji crests. Copy lives in statics.js; plates in
+   assets/statics; marks in assets/brand. The block is anchored above the
+   3:4 grid crop so the headline survives the profile view. */
+const STATIC_SET = 'rts-statics-v1';
+const RTS = { ink: '#14120e', red: '#b5432f', white: '#fbf7ef', font: 'Fraunces' };
+function staticHeadSize(t) { const n = t.length; return n <= 32 ? 92 : n <= 62 ? 64 : n <= 92 ? 54 : 47; }
+function staticLayers(s) {
+  const left = s.layout === 'split';
+  const align = left ? 'left' : 'center', ax = left ? 0.067 : 0.5;
+  const mk = o => newText(Object.assign({ font: RTS.font, align, x: ax, color: RTS.white, box: 'none', outline: 0, shadow: 0.45, behind: false }, o));
+  const kicker = s.kicker ? mk({ text: s.kicker, weight: 600, size: 26, track: 0.24, line: 1.2, width: 0.86, upper: true, color: '#e6dfd2', shadow: 0.3 }) : null;
+  const head = mk({ text: s.head, weight: 500, size: staticHeadSize(s.head), track: -0.01, line: 1.02, width: 0.86, upper: true });
+  const sub = mk({ text: s.sub, weight: 400, italic: true, size: 27, track: 0, line: 1.3, width: 0.74, color: '#f1ece2', shadow: 0.3 });
+  const cta = s.cta ? mk({ text: s.cta, weight: 600, size: 17, track: 0.2, line: 1.2, width: 0.86, upper: true, shadow: 0 }) : null;
+  const gap = 20, btnH = 54;
+  const kH = kicker ? measureLayer(kicker).height : 0, hH = measureLayer(head).height, sH = measureLayer(sub).height;
+  const total = (kicker ? kH + gap : 0) + hH + 14 + 3 + 14 + sH + (cta ? gap + btnH : 0);
+  let y = 0.87 * H - total; const layers = [];
+  if (kicker) { kicker.y = y / H; layers.push(kicker); y += kH + gap; }
+  head.y = y / H; layers.push(head); y += hH + 14;
+  layers.push(newRule({ x: left ? ax + 0.02 : 0.5, y: (y + 1.5) / H, width: 0.041, thick: 3, color: RTS.red, alpha: 1 })); y += 3 + 14;
+  sub.y = y / H; layers.push(sub); y += sH;
+  if (cta) {
+    y += gap;
+    const x = measureCtx(); x.font = fontString(cta); x.letterSpacing = `${cta.track * cta.size}px`;
+    const bw = x.measureText(cta.text.toUpperCase()).width + 64, yc = y + btnH / 2;
+    layers.push(newRule({ x: left ? ax + bw / 2 / W : 0.5, y: yc / H, width: bw / W, thick: btnH, color: RTS.red, alpha: 1 }));
+    cta.y = (yc - cta.size * cta.line / 2) / H; layers.push(cta);
+  }
+  // signature strip
+  const sy = 0.925;
+  layers.push(newLogo({ image: 'rtsMark', x: 0.098, y: sy, size: 0.059, alpha: 0.92 }));
+  layers.push(mk({ text: 'Harrison Saito', weight: 500, size: 28, track: 0, line: 1.05, width: 0.5, align: 'left', x: 0.145, y: (sy * H - 31) / H, shadow: 0.25 }));
+  layers.push(mk({ text: 'Educator. Martial Artist. Coach.', weight: 500, size: 14, track: 0.18, line: 1.2, width: 0.6, upper: true, align: 'left', x: 0.145, y: (sy * H + 5) / H, color: '#cfc7b8', shadow: 0 }));
+  layers.push(newLogo({ image: 'rtsShinbukan', x: 0.815, y: sy, size: 0.043, alpha: 0.9 }));
+  layers.push(newLogo({ image: 'rtsSeizanji', x: 0.895, y: sy, size: 0.078, alpha: 0.9 }));
+  return layers;
+}
+function buildStaticDoc(s) {
+  const d = baseDoc(`${s.id} \u00b7 ${s.name}`);
+  d.bg = { ...d.bg, type: 'image', image: s.bg, fit: 'fill', scale: 1, x: 0, y: 0, blur: 0, bright: 1, sat: 1, pad: RTS.ink };
+  d.subject = { ...d.subject, on: false };
+  d.overlay = { type: 'bottom', color: '#0c0905', opacity: s.layout === 'cover' || s.layout === 'archival' ? 0.35 : 0 };
+  d.grain = 0.04;
+  d.layers = staticLayers(s);
+  d.rts = { id: s.id, set: STATIC_SET, layout: s.layout };
+  return d;
+}
+/* Given to every browser once, like the demo set; bump STATIC_SET to push a
+   changed set. Earlier static covers are replaced, everything else is kept.
+   They go to the top of the profile grid (18 = six full rows, so the mosaic
+   at the foot stays aligned). */
+async function seedStaticSet() {
+  const list = window.__RTS_STATICS__ || []; if (!list.length) return false;
+  setStatus('loading the static set\u2026');
+  await Promise.allSettled(['500 100px', '600 100px', 'italic 400 100px'].map(f => document.fonts.load(`${f} "${RTS.font}"`)));
+  // newest in the library, so the studio opens on A1.1 (Date.now alone can tie with a batch seeded in the same tick)
+  const now = Math.max(Date.now(), ...covers.map(c => c.updatedAt || 0)) + 1000;
+  const recs = list.map((s, i) => { const d = buildStaticDoc(s); d.id = uid(); d.createdAt = d.updatedAt = now + (list.length - i); return coverRecord(d); });
+  const old = covers.filter(c => c.doc?.rts), oldIds = new Set(old.map(c => c.id));
+  for (const c of old) await store.deleteCover(c.id).catch(() => {});
+  covers = covers.filter(c => !c.doc?.rts).concat(recs);
+  await store.saveCovers(recs);
+  settings.gridOrder = [...recs.map(r => r.id), ...(settings.gridOrder || []).filter(id => !oldIds.has(id))];
+  settings.staticSet = STATIC_SET;
+  await store.saveSettings(settings).catch(() => {});
+  return true;
+}
+
 /* ---------------- views ---------------- */
 function switchView(v) {
   $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.view === v));
@@ -1607,6 +1708,7 @@ document.fonts.addEventListener('loadingdone', () => { renderAll(); renderCoverL
   batchOpts.pool = assetsOf('photo').filter(p => p.still).map(p => p.id);
   let seeded = false;
   if (settings.demoSet !== DEMO_SET) { try { seeded = await seedDemoSet(); } catch (e) { console.warn('demo set', e); } }
+  if (settings.staticSet !== STATIC_SET) { try { await seedStaticSet(); } catch (e) { console.warn('static set', e); } }
   if (settings.demoView !== DEMO_VIEW) { settings.shape = '34'; settings.demoView = DEMO_VIEW; store.saveSettings(settings).catch(() => {}); }
   if (covers.length) loadDoc([...covers].sort((a, b) => b.updatedAt - a.updatedAt)[0].doc);
   else { // seed a first set from the templates so the studio opens with something to look at

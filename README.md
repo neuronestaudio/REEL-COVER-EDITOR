@@ -63,6 +63,14 @@ grid. Covers already in that browser are kept but taken off the grid. Bump `DEMO
 `app.js` to push a changed set to browsers that already have one. A link ending `#grid` always
 opens on the profile.
 
+**Static set** — the 18 Return to Self statics (16 Sep 2026, one per video from Nathan's
+shoot) are shipped as ordinary editable covers, seeded once per browser like the demo set and
+placed at the top of the profile grid. Copy is in `statics.js`, the plates in `assets/statics/`
+(photo at the top, ink below where the caption block sits) and Harrison's marks in
+`assets/brand/` (ensō mark, Shinbukan and Seizanji crests, also available as logo layers).
+The **Return to Self static** template starts a new cover in the same look. Bump `STATIC_SET`
+in `app.js` to push a changed set.
+
 **3×3 mosaic** — nine reels whose profile-grid crop reassembles into one picture. Instagram
 crops reels to 3:4 from the centre, so the mosaic is laid out across nine 1080×1440 crop
 windows (3240×4320 overall) and each tile renders full-bleed 1080×1920 around its own window,
@@ -111,6 +119,8 @@ app.js       renderer, editor, storage, export
 assets/      shipped photo, studio-grade cutout, mosaic source
 assets/stills/  day-1 REEL COVER stills (the default batch photo set)
 captions.js  the 72 cover captions, with hand-set line breaks
+statics.js   the 18 static-set boards (copy, plate, layout)
+assets/statics/  static-set plates · assets/brand/  Harrison's marks
 mp/          MediaPipe Selfie Segmentation runtime and models (~12 MB)
 vendor/      JSZip (ZIP export)
 vercel.json  cache headers
