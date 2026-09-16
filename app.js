@@ -16,6 +16,7 @@ const FONTS = [
   { n: 'Instrument Serif', w: [400], i: true },
   { n: 'Bebas Neue', w: [400], i: false },
   { n: 'Anton', w: [400], i: false },
+  { n: 'Poppins', w: [500, 600, 700, 800, 900], i: true },
   { n: 'Syne', w: [400, 600, 800], i: false },
   { n: 'Unbounded', w: [400, 700, 900], i: false },
   { n: 'Manrope', w: [400, 500, 600, 700, 800], i: false },
@@ -40,6 +41,20 @@ function fontString(l) {
 const BUILTIN = {
   photo: { id: 'photo', kind: 'photo', name: 'Tatami studio (photo)', url: 'assets/photo.jpg', builtin: true },
   cutout: { id: 'cutout', kind: 'cutout', name: 'Tatami studio (cutout)', url: 'assets/cutout.png', builtin: true },
+  mosaic: { id: 'mosaic', kind: 'photo', name: 'Candlelight (mosaic)', url: 'assets/mosaic.jpg', builtin: true },
+  // Day-1 REEL COVER stills — the default photo set for the batch
+  still01: { id: 'still01', kind: 'photo', name: 'Seated, looking away', url: 'assets/stills/still-01.jpg', builtin: true, still: true },
+  still02: { id: 'still02', kind: 'photo', name: 'Behind camera, softbox', url: 'assets/stills/still-02.jpg', builtin: true, still: true },
+  still03: { id: 'still03', kind: 'photo', name: 'Empty chair, shoji', url: 'assets/stills/still-03.jpg', builtin: true, still: true },
+  still04: { id: 'still04', kind: 'photo', name: 'Laughing at phone', url: 'assets/stills/still-04.jpg', builtin: true, still: true },
+  still05: { id: 'still05', kind: 'photo', name: 'Chin raised, looking up', url: 'assets/stills/still-05.jpg', builtin: true, still: true },
+  still06: { id: 'still06', kind: 'photo', name: 'Reading phone', url: 'assets/stills/still-06.jpg', builtin: true, still: true },
+  still07: { id: 'still07', kind: 'photo', name: 'Arms raised, laughing', url: 'assets/stills/still-07.jpg', builtin: true, still: true },
+  still08: { id: 'still08', kind: 'photo', name: 'Hands together, smiling', url: 'assets/stills/still-08.jpg', builtin: true, still: true },
+  still09: { id: 'still09', kind: 'photo', name: 'Seated, low light', url: 'assets/stills/still-09.jpg', builtin: true, still: true },
+  still10: { id: 'still10', kind: 'photo', name: 'Seated, hands in lap', url: 'assets/stills/still-10.jpg', builtin: true, still: true },
+  still11: { id: 'still11', kind: 'photo', name: 'Empty chair, cushion', url: 'assets/stills/still-11.jpg', builtin: true, still: true },
+  still12: { id: 'still12', kind: 'photo', name: 'Candlelight, match', url: 'assets/stills/still-12.jpg', builtin: true, still: true },
 };
 let assets = { ...BUILTIN };
 const imgCache = {};
@@ -47,7 +62,8 @@ function getImg(id) {
   if (!id || !assets[id]) return null;
   if (imgCache[id]) return imgCache[id].complete && imgCache[id].naturalWidth ? imgCache[id] : null;
   const im = new Image(); im.crossOrigin = 'anonymous'; im.src = assets[id].url;
-  im.onload = () => renderAll(); imgCache[id] = im; return null;
+  im.onload = () => { renderAll(); if (document.getElementById('view-batch')?.classList.contains('active')) renderMosaicPreview(); };
+  imgCache[id] = im; return null;
 }
 function assetsOf(kind) { return Object.values(assets).filter(a => a.kind === kind); }
 
@@ -116,6 +132,7 @@ function wrapLines(x, text, maxW) {
    the pad colour), the default covers the frame. Pan is a fraction of the
    overhang, so the slider range always means something at any zoom. */
 function bgBox(b, im) {
+  if (b.rect) return b.rect; // exact placement (mosaic tiles)
   const base = b.fit === 'fit' ? Math.min(W / im.naturalWidth, H / im.naturalHeight) : Math.max(W / im.naturalWidth, H / im.naturalHeight);
   const s = base * b.scale * (1 + b.blur / 120);
   const w = im.naturalWidth * s, h = im.naturalHeight * s;
@@ -294,6 +311,14 @@ const store = {
     try { localStorage.setItem(this.KEY, JSON.stringify(all)); }
     catch { toast('Browser storage is full — delete old versions or covers'); }
   },
+  /* Bulk write for the 72-cover batch — one storage write, not 72. */
+  async saveCovers(list, onProgress) {
+    const all = await this.listCovers(); const map = new Map(all.map(c => [c.id, c]));
+    list.forEach(r => map.set(r.id, r));
+    try { localStorage.setItem(this.KEY, JSON.stringify([...map.values()])); }
+    catch { toast('Browser storage is full — export what you need, then clear old covers'); }
+    onProgress && onProgress(list.length);
+  },
   async deleteCover(id) {
     const all = (await this.listCovers()).filter(c => c.id !== id);
     try { localStorage.setItem(this.KEY, JSON.stringify(all)); } catch {}
@@ -430,13 +455,13 @@ function hitTest(p) {
 }
 preview.addEventListener('pointerdown', e => {
   const p = canvasPoint(e); const id = hitTest(p); select(id);
-  const target = id === '__subject' ? doc.subject : id ? doc.layers.find(l => l.id === id) : doc.bg.type === 'image' ? doc.bg : null;
+  const target = id === '__subject' ? doc.subject : id ? doc.layers.find(l => l.id === id) : (doc.bg.type === 'image' && !doc.bg.rect) ? doc.bg : null;
   if (!target) return;
   drag = { id: id || '__bg', p, x0: target.x, y0: target.y, moved: false, before: snapshot() };
   preview.setPointerCapture(e.pointerId); preview.classList.add('grabbing');
 });
 preview.addEventListener('pointermove', e => {
-  if (!drag) { const id = hitTest(canvasPoint(e)); preview.classList.toggle('grab', !!id || doc.bg.type === 'image'); return; }
+  if (!drag) { const id = hitTest(canvasPoint(e)); preview.classList.toggle('grab', !!id || (doc.bg.type === 'image' && !doc.bg.rect)); return; }
   const p = canvasPoint(e); const dx = (p.x - drag.p.x) / W, dy = (p.y - drag.p.y) / H; if (Math.abs(dx) + Math.abs(dy) < 0.001 && !drag.moved) return;
   drag.moved = true;
   const t = drag.id === '__bg' ? doc.bg : drag.id === '__subject' ? doc.subject : doc.layers.find(l => l.id === drag.id); if (!t) return;
@@ -451,7 +476,7 @@ preview.addEventListener('pointermove', e => {
 });
 // wheel over the canvas zooms the background image
 preview.addEventListener('wheel', e => {
-  if (doc.bg.type !== 'image' || sel) return; e.preventDefault();
+  if (doc.bg.type !== 'image' || doc.bg.rect || sel) return; e.preventDefault();
   doc.bg.scale = +clamp(doc.bg.scale * (e.deltaY > 0 ? 0.97 : 1.03), 0.4, 3).toFixed(3);
   $('#bgScale')._sync(); renderAll(); scheduleSave();
 }, { passive: false });
@@ -674,22 +699,43 @@ function syncAll() {
   renderLayers(); syncProps();
 }
 function refreshAssetSelects() {
+  if ($('#mosImage')?._fill) $('#mosImage')._fill();
   const opt = list => list.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
   $('#subjImage').innerHTML = opt(assetsOf('cutout'));
   $('#lImage').innerHTML = '<option value="">— none —</option>' + opt(assetsOf('logo'));
 }
-function pickFile(cb, accept = 'image/*') { const fi = $('#fileInput'); fi.accept = accept; fi.value = ''; fi.onchange = () => { if (fi.files[0]) cb(fi.files[0]); }; fi.click(); }
+function pickFiles(cb, accept = 'image/*') { const fi = $('#fileInput'); fi.accept = accept; fi.multiple = true; fi.value = '';
+  fi.onchange = () => { const f = [...fi.files]; fi.multiple = false; if (f.length) cb(f); }; fi.click(); }
+function pickFile(cb, accept = 'image/*') { const fi = $('#fileInput'); fi.accept = accept; fi.multiple = false; fi.value = ''; fi.onchange = () => { if (fi.files[0]) cb(fi.files[0]); }; fi.click(); }
 
 /* ---------------- covers library ---------------- */
 function loadDoc(d) { clearTimeout(saveTimer); doc = JSON.parse(JSON.stringify(d)); sel = null; undoStack = []; redoStack = []; updateUndoBtns(); syncAll(); renderAll(); renderCoverList(); renderVersions(); setStatus('saved · this browser', 'ok'); }
 function thumbCanvas(d, cssW) { const c = document.createElement('canvas'); renderTo(c, d, cssW); return c; }
+/* With 80+ covers, drawing every thumbnail up front locks the page for seconds.
+   Tiles paint as they come into view instead. */
+const lazyIO = typeof IntersectionObserver === 'function' ? new IntersectionObserver(es => {
+  es.forEach(e => { if (!e.isIntersecting) return; lazyIO.unobserve(e.target); lazyDraw(e.target); });
+}, { rootMargin: '400px' }) : null;
+async function lazyDraw(c) {
+  if (!c._doc || c._drawn) return; c._drawn = true;
+  await preloadAssets([c._doc.bg?.image, c._doc.subject?.on && c._doc.subject.image, ...(c._doc.layers || []).map(l => l.image)]);
+  renderTo(c, c._doc, c._w);
+}
+function lazyCanvas(d, cssW) {
+  const c = document.createElement('canvas');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  c.width = Math.round(cssW * dpr); c.height = Math.round(cssW * H / W * dpr);
+  c._doc = d; c._w = cssW;
+  if (lazyIO) lazyIO.observe(c); else lazyDraw(c);
+  return c;
+}
 function renderCoverList() {
   const c = $('#coverList'); c.innerHTML = '';
   const list = [...covers].sort((a, b) => b.updatedAt - a.updatedAt);
   if (!list.length) c.innerHTML = '<div class="empty">No covers yet.</div>';
   list.forEach(r => {
     const d = document.createElement('div'); d.className = 'cover-item'; d.setAttribute('aria-current', r.id === doc?.id);
-    const th = thumbCanvas(r.id === doc?.id ? doc : r.doc, 38 * 2); th.style.width = '38px'; th.style.height = '68px';
+    const th = lazyCanvas(r.id === doc?.id ? doc : r.doc, 38 * 2); th.style.width = '38px'; th.style.height = '68px';
     d.appendChild(th);
     const info = document.createElement('div'); info.innerHTML = `<div class="nm">${escapeHtml(r.name)}</div><div class="meta">${fmtTime(r.updatedAt)} · ${(r.versions || []).length} ver</div>`; d.appendChild(info);
     const acts = document.createElement('div'); acts.innerHTML = `<button class="icon small ghost" title="Duplicate">⧉</button><button class="icon small ghost" title="Delete">✕</button>`;
@@ -774,7 +820,7 @@ function renderGrid() {
   const n = Math.max(9, Math.ceil(order.length / 3) * 3);
   for (let i = 0; i < n; i++) {
     const t = document.createElement('div'); t.className = 'tile'; const r = order[i];
-    if (r) { const d = r.id === doc?.id ? doc : r.doc; t.innerHTML = `<div class="play"></div><div class="views">▶ ${(3.1 + (i * 7 % 11)).toFixed(1)}K</div>`; t.prepend(thumbCanvas(d, 130 * 2)); t.draggable = true; t.dataset.id = r.id; t.title = r.name;
+    if (r) { const d = r.id === doc?.id ? doc : r.doc; t.innerHTML = `<div class="play"></div><div class="views">▶ ${(3.1 + (i * 7 % 11)).toFixed(1)}K</div>`; t.prepend(lazyCanvas(d, 130 * 2)); t.draggable = true; t.dataset.id = r.id; t.title = r.name;
       t.addEventListener('dragstart', e => { gridDrag = r.id; e.dataTransfer.effectAllowed = 'move'; }); t.addEventListener('dragover', e => { e.preventDefault(); t.classList.add('drop'); }); t.addEventListener('dragleave', () => t.classList.remove('drop'));
       t.addEventListener('drop', e => { e.preventDefault(); t.classList.remove('drop'); reorderGrid(gridDrag, r.id); });
       t.addEventListener('dblclick', () => { loadDoc(d); switchView('editor'); });
@@ -789,7 +835,7 @@ function renderGrid() {
 function gridRow(r, inGrid) {
   const d = document.createElement('div'); d.className = 'gl'; d.draggable = true;
   d.innerHTML = `<span>${escapeHtml(r.name)}</span><span class="acts">${inGrid ? '<button class="icon small ghost" title="Earlier (down)">▼</button><button class="icon small ghost" title="Later (up)">▲</button><button class="icon small ghost" title="Remove">✕</button>' : '<button class="small">Add</button>'}</span>`;
-  d.prepend(thumbCanvas(r.id === doc?.id ? doc : r.doc, 26 * 2));
+  d.prepend(lazyCanvas(r.id === doc?.id ? doc : r.doc, 26 * 2));
   d.addEventListener('dragstart', () => { gridDrag = r.id; d.classList.add('dragging'); }); d.addEventListener('dragend', () => d.classList.remove('dragging'));
   d.addEventListener('dragover', e => e.preventDefault()); d.addEventListener('drop', e => { e.preventDefault(); if (inGrid) reorderGrid(gridDrag, r.id); });
   const bs = $$('button', d);
@@ -892,11 +938,331 @@ $('#btnCutToEditor').onclick = () => { if (cut.candidate) return toast('Keep the
 $('#btnCutNewCover').onclick = () => { if (cut.candidate) return toast('Keep the cutout first'); const d = baseDoc('Cutout cover'); if (cut.bg) d.bg = { ...d.bg, ...cut.bg }; d.subject = { ...d.subject, on: true, image: cut.cutout, scale: +$('#cSubjScale').value, y: +$('#cSubjY').value, shadow: +$('#cSubjShadow').value }; d.overlay.type = 'none'; d.layers = [newText({ text: 'Caption goes here', y: 0.1, color: d.bg.type === 'solid' && isLight(d.bg.color) ? '#16150f' : '#ffffff', shadow: 0 })]; loadDoc(d); persistCurrent(); switchView('editor'); };
 function isLight(h) { const n = parseInt(h.slice(1), 16); return ((n >> 16 & 255) * .3 + (n >> 8 & 255) * .59 + (n & 255) * .11) > 150; }
 
+
+/* ================= batch: the 72-cover set =================
+   Captions come from the cover-text index (captions.js). Each cover is an
+   ordinary document afterwards — nothing about it is locked or special. */
+const COVER_TEXT = (window.__COVER_TEXT__ || []).slice();
+const batchOpts = { pool: [], tint: 0.3, size: 112, pos: 0.36, mono: false, replace: true, shuffle: true, seq: null };
+
+function shuffled(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0;[a[i], a[j]] = [a[j], a[i]]; } return a; }
+/* Even spread: each pass uses every photo once, and a photo never follows itself
+   across the seam between passes. */
+function assort(pool, count, doShuffle) {
+  if (!pool.length) return [];
+  const out = [];
+  while (out.length < count) {
+    let bag = doShuffle ? shuffled(pool) : pool.slice();
+    if (out.length && bag.length > 1 && bag[0] === out[out.length - 1]) [bag[0], bag[1]] = [bag[1], bag[0]];
+    for (const p of bag) { if (out.length < count) out.push(p); }
+  }
+  return out;
+}
+
+/* getImg is lazy, so anything that RENDERS (rather than just schedules a
+   repaint) has to wait for the decode first. */
+function preloadAssets(ids) {
+  return Promise.all([...new Set(ids)].filter(Boolean).map(id => new Promise(res => {
+    if (getImg(id)) return res();
+    const a = assets[id]; if (!a) return res();
+    const im = imgCache[id] || new Image();
+    if (im.complete && im.naturalWidth) return res();
+    im.addEventListener('load', res, { once: true });
+    im.addEventListener('error', res, { once: true });
+    if (!im.src) { im.crossOrigin = 'anonymous'; im.src = a.url; imgCache[id] = im; }
+    setTimeout(res, 8000);
+  })));
+}
+let _mctx;
+function measureCtx() { if (!_mctx) _mctx = document.createElement('canvas').getContext('2d'); return _mctx; }
+function measureLayer(l) {
+  const x = measureCtx(); x.font = fontString(l); x.letterSpacing = `${l.track * l.size}px`;
+  const lines = wrapLines(x, l.upper ? l.text.toUpperCase() : l.text, l.width * W);
+  return { lines, height: lines.length * l.size * l.line };
+}
+/* Shrink the headline until it fits in at most `maxLines` lines. */
+function fitMain(l, maxLines) {
+  for (let s = l.size; s >= 54; s -= 4) { l.size = s; if (measureLayer(l).lines.length <= maxLines) return l; }
+  return l;
+}
+/* Bold-sans era: white Poppins with a heavy dark outline, centred, no box.
+   The block is vertically centred on `pos` so kicker/headline/sub stay together. */
+function boldSansLayers(c, o) {
+  const layers = [];
+  const mk = (over) => newText(Object.assign({
+    font: 'Poppins', align: 'center', x: 0.5, color: '#ffffff', box: 'none',
+    boxColor: '#0d0b08', shadow: 0.38, behind: false,
+  }, over));
+  const kicker = c.kicker ? mk({ text: c.kicker, weight: 600, size: 30, track: 0.18, line: 1.2, width: 0.86, upper: true, outline: 5, color: '#f2efe8' }) : null;
+  const main = fitMain(mk({ text: c.main, weight: 800, size: o.size, track: -0.022, line: 1.06, width: 0.86, outline: Math.round(o.size / 13) }), 4);
+  const sub = c.sub ? mk({ text: c.sub, weight: 600, size: Math.round(o.size * 0.37), track: 0, line: 1.22, width: 0.8, outline: Math.round(o.size / 22), color: '#ece7dc' }) : null;
+
+  const gap = main.size * 0.34;
+  const kH = kicker ? measureLayer(kicker).height : 0;
+  const mH = measureLayer(main).height;
+  const sH = sub ? measureLayer(sub).height : 0;
+  const total = kH + (kicker ? gap * 0.6 : 0) + mH + (sub ? gap : 0) + sH;
+  let y = o.pos * H - total / 2;
+  if (kicker) { kicker.y = y / H; y += kH + gap * 0.6; layers.push(kicker); }
+  main.y = y / H; y += mH; layers.push(main);
+  if (sub) { sub.y = (y + gap) / H; layers.push(sub); }
+  return layers;
+}
+function batchDocName(c) {
+  const n = String(c.n).padStart(2, '0');
+  if (c.empty) return `${n} · needs copy`;
+  const t = (c.kicker ? c.kicker + ' — ' : '') + c.main.replace(/\n/g, ' ');
+  return `${n} · ${t.length > 46 ? t.slice(0, 45).trimEnd() + '…' : t}`;
+}
+function buildBatchDoc(c, photoId, o) {
+  const d = baseDoc(batchDocName(c));
+  d.id = uid();
+  d.bg = { ...d.bg, type: 'image', image: photoId, fit: 'fill', scale: 1, x: 0, y: 0, blur: 0, bright: 1, sat: o.mono ? 0 : 1, pad: '#0d0b08' };
+  d.subject = { ...d.subject, on: false };
+  d.overlay = { type: 'vignette', color: '#000000', opacity: o.tint };
+  d.grain = 0.05;
+  d.layers = c.empty ? [] : boldSansLayers(c, o);
+  d.batch = { n: c.n, date: c.date, era: c.era, source: c.source, flag: c.flag, empty: c.empty };
+  return d;
+}
+
+function renderPool() {
+  const g = $('#poolGrid'); if (!g) return; g.innerHTML = '';
+  const add = document.createElement('button'); add.className = 'addtile'; add.title = 'Add photos (you can select several at once)';
+  add.textContent = '+'; add.onclick = () => pickFiles(async files => {
+    setStatus('adding photos…');
+    for (const f of files) { if (!f.type.startsWith('image/')) continue; const rec = await store.putAsset(f, 'photo', f.name.replace(/\.[^.]+$/, '').slice(0, 40)); batchOpts.pool.push(rec.id); }
+    setStatus('saved', 'ok'); refreshAssetSelects(); renderBgPick(); renderPool(); toast(`${files.length} photo${files.length > 1 ? 's' : ''} added`);
+  });
+  g.appendChild(add);
+  const all = [...assetsOf('photo'), ...assetsOf('bg')];
+  all.forEach(a => {
+    const b = document.createElement('button'); b.title = a.name;
+    b.setAttribute('aria-pressed', batchOpts.pool.includes(a.id));
+    const im = new Image(); im.src = a.url; im.alt = a.name; b.appendChild(im);
+    const t = document.createElement('span'); t.className = 'tick'; t.textContent = '✓'; b.appendChild(t);
+    b.onclick = () => { const i = batchOpts.pool.indexOf(a.id); i < 0 ? batchOpts.pool.push(a.id) : batchOpts.pool.splice(i, 1); renderPool(); };
+    g.appendChild(b);
+  });
+  const n = batchOpts.pool.length;
+  $('#poolCount').textContent = n ? `${n} of ${all.length} selected.` : 'None selected yet.';
+  $('#stepPhotos').querySelector('h4').classList.toggle('done', n > 0);
+  $('#btnGenerate').disabled = n === 0;
+  $('#btnGenerate').title = n ? '' : 'Add at least one photo first';
+}
+function renderCapsTable() {
+  const b = $('#capsBody'); if (!b || b.children.length) return;
+  COVER_TEXT.forEach(c => {
+    const tr = document.createElement('tr');
+    const text = c.empty ? '<span class="blank">blank — new copy required</span>'
+      : (c.kicker ? `<div class="kick">${escapeHtml(c.kicker)}</div>` : '') +
+        `<div class="mn">${escapeHtml(c.main)}</div>` +
+        (c.sub ? `<div class="sb">${escapeHtml(c.sub)}</div>` : '');
+    tr.innerHTML = `<td class="num">${String(c.n).padStart(2, '0')}</td><td class="era">${c.date}</td><td>${text}</td><td class="era">${c.era.replace(' era', '')}</td>`;
+    b.appendChild(tr);
+  });
+}
+function renderBatchPreviews(docs) {
+  const p = $('#batchPreviews'); p.innerHTML = '';
+  docs.slice(0, 12).forEach(d => {
+    const f = document.createElement('figure');
+    const cv = lazyCanvas(d, 110 * 2); cv.title = 'Open in the editor';
+    cv.onclick = () => { const rec = covers.find(c => c.id === d.id); if (rec) { loadDoc(rec.doc); switchView('editor'); } };
+    f.appendChild(cv);
+    const cap = document.createElement('figcaption'); cap.textContent = d.name; f.appendChild(cap);
+    p.appendChild(f);
+  });
+}
+
+async function generateBatch() {
+  if (!batchOpts.pool.length) return toast('Add at least one photo first');
+  const btn = $('#btnGenerate'), prog = $('#batchProg'), bar = $('i', prog);
+  btn.disabled = true; prog.classList.add('on'); bar.style.width = '2%';
+  $('#batchMsg').textContent = 'loading fonts…';
+  // the headline is measured, so Poppins must be real before anything is laid out
+  await Promise.allSettled([500, 600, 800].map(w => document.fonts.load(`${w} 100px "Poppins"`)));
+  $('#batchMsg').textContent = 'loading photos…';
+  await preloadAssets(batchOpts.pool);
+
+  if (batchOpts.replace) {
+    const old = covers.filter(c => c.doc?.batch);
+    for (const o of old) { await store.deleteCover(o.id).catch(() => {}); }
+    covers = covers.filter(c => !c.doc?.batch);
+    settings.gridOrder = (settings.gridOrder || []).filter(id => covers.some(c => c.id === id));
+  }
+  batchOpts.seq = assort(batchOpts.pool, COVER_TEXT.length, batchOpts.shuffle);
+
+  const now = Date.now(), recs = [], docs = [];
+  COVER_TEXT.forEach((c, i) => {
+    const d = buildBatchDoc(c, batchOpts.seq[i], batchOpts);
+    d.createdAt = d.updatedAt = now + i;
+    docs.push(d);
+    recs.push({ id: d.id, name: d.name, createdAt: d.createdAt, updatedAt: d.updatedAt, doc: d, versions: [] });
+  });
+
+  $('#batchMsg').textContent = 'saving…';
+  await store.saveCovers(recs, n => { bar.style.width = Math.round(4 + n / recs.length * 96) + '%'; $('#batchMsg').textContent = `${n} of ${recs.length} saved`; });
+  covers = covers.concat(recs);
+  // newest-first on a profile grid, so the set reads 72 → 01 top-left
+  settings.gridOrder = recs.map(r => r.id).reverse().concat(settings.gridOrder || []);
+  await store.saveSettings(settings).catch(() => {});
+
+  renderBatchPreviews(docs); renderCoverList();
+  const blanks = COVER_TEXT.filter(c => c.empty).length;
+  $('#batchMsg').textContent = `${recs.length} covers · ${blanks} blank`;
+  $('#stepRun').querySelector('h4').classList.add('done');
+  btn.disabled = false; setTimeout(() => { prog.classList.remove('on'); bar.style.width = '0'; }, 800);
+  toast(`${recs.length} covers generated — ${blanks} left blank for new copy`);
+  loadDoc(docs[0]);
+}
+
+async function exportBatchZip() {
+  const set = covers.filter(c => c.doc?.batch).sort((a, b) => a.doc.batch.n - b.doc.batch.n);
+  if (!set.length) return toast('Generate the set first');
+  const prog = $('#batchProg'), bar = $('i', prog); prog.classList.add('on');
+  const zip = new JSZip();
+  for (let i = 0; i < set.length; i++) {
+    const r = set[i]; const d = r.id === doc?.id ? doc : r.doc;
+    zip.file(`${String(d.batch.n).padStart(2, '0')}-${slug(d.name.replace(/^\d+ · /, ''))}.png`, await renderBlob(d, 1));
+    bar.style.width = Math.round((i + 1) / set.length * 100) + '%'; $('#batchMsg').textContent = `rendering ${i + 1} of ${set.length}`;
+  }
+  const blob = await zip.generateAsync({ type: 'blob' });
+  await store.download('harrison-reel-covers-72.zip', blob);
+  $('#batchMsg').textContent = 'exported'; prog.classList.remove('on'); bar.style.width = '0';
+}
+
+function bindBatch() {
+  const rng = (id, key, fmt) => { const e = $('#' + id), l = $('#' + id + 'V'); e.addEventListener('input', () => { batchOpts[key] = +e.value; if (l) l.textContent = fmt(+e.value); }); l.textContent = fmt(+e.value); };
+  rng('bTint', 'tint', v => Math.round(v * 100) + '%');
+  rng('bSize', 'size', v => v);
+  rng('bPos', 'pos', v => v.toFixed(2));
+  $('#bMono').onclick = e => { batchOpts.mono = !batchOpts.mono; e.currentTarget.setAttribute('aria-pressed', batchOpts.mono); };
+  $('#bReplace').onclick = () => { batchOpts.replace = true; $('#bReplace').setAttribute('aria-pressed', true); $('#bKeep').setAttribute('aria-pressed', false); };
+  $('#bKeep').onclick = () => { batchOpts.replace = false; $('#bKeep').setAttribute('aria-pressed', true); $('#bReplace').setAttribute('aria-pressed', false); };
+  $('#bShuffle').onclick = () => { batchOpts.shuffle = true; $('#bShuffle').setAttribute('aria-pressed', true); $('#bSeq').setAttribute('aria-pressed', false); };
+  $('#bSeq').onclick = () => { batchOpts.shuffle = false; $('#bSeq').setAttribute('aria-pressed', true); $('#bShuffle').setAttribute('aria-pressed', false); };
+  $('#poolAll').onclick = () => { batchOpts.pool = [...assetsOf('photo'), ...assetsOf('bg')].map(a => a.id); renderPool(); };
+  $('#poolNone').onclick = () => { batchOpts.pool = []; renderPool(); };
+  $('#btnGenerate').onclick = generateBatch;
+  $('#btnReshuffle').onclick = generateBatch;
+  $('#btnBatchZip').onclick = exportBatchZip;
+  const blanks = COVER_TEXT.filter(c => c.empty).length;
+  $('#batchState').textContent = `${COVER_TEXT.length - blanks} captioned covers and ${blanks} left blank for new copy. Existing covers are untouched unless you replace a previous batch.`;
+}
+async function renderBatchView() {
+  renderCapsTable(); renderPool();
+  await preloadAssets([mosaicOpts.image, ...batchOpts.pool.slice(0, 12)]);
+  renderMosaicPreview();
+  const existing = covers.filter(c => c.doc?.batch).sort((a, b) => a.doc.batch.n - b.doc.batch.n);
+  if (existing.length && !$('#batchPreviews').children.length) {
+    renderBatchPreviews(existing.map(r => r.doc));
+    $('#batchMsg').textContent = `${existing.length} covers in your library`;
+    $('#stepRun').querySelector('h4').classList.add('done');
+  }
+}
+
+
+/* ================= 3x3 grid mosaic =================
+   Nine reels whose PROFILE-GRID CROP reassembles into one picture. Instagram
+   crops a reel to 3:4 from the centre, so the mosaic is laid out across nine
+   1080x1440 crop windows (3240 x 4320 overall) and each tile is rendered
+   full-bleed 1080x1920 around its own window — the reel still looks whole when
+   opened, and the grid shows the mosaic. */
+const MOS = { W: 1080, H: 1440, COLS: 3, ROWS: 3 };
+const mosaicOpts = { image: 'mosaic', zoom: 1, offX: 0, offY: 0 };
+
+function mosaicRect(im, r, c, o) {
+  const MW = MOS.W * MOS.COLS, MH = MOS.H * MOS.ROWS;
+  // cover the mosaic box, with 240px of overscan so full-bleed tiles never show a gap
+  const s = Math.max(MW / im.naturalWidth, (MH + 480) / im.naturalHeight) * o.zoom;
+  const dw = im.naturalWidth * s, dh = im.naturalHeight * s;
+  const ox = (MW - dw) / 2 + o.offX * (Math.abs(dw - MW) / 2 + MOS.W * 0.5);
+  const oy = (MH - dh) / 2 + o.offY * (Math.abs(dh - MH) / 2 + MOS.H * 0.5);
+  return { x: ox - c * MOS.W, y: oy - r * MOS.H + (H - MOS.H) / 2, w: dw, h: dh };
+}
+/* Instagram puts the newest post top-left, so the tiles are posted in reverse
+   reading order: bottom-right first, top-left last. */
+function mosaicOrder() {
+  const t = [];
+  for (let r = MOS.ROWS - 1; r >= 0; r--) for (let c = MOS.COLS - 1; c >= 0; c--) t.push({ r, c });
+  return t; // index 0 = post first
+}
+const POSNAME = [['top-left', 'top-centre', 'top-right'], ['middle-left', 'centre', 'middle-right'], ['bottom-left', 'bottom-centre', 'bottom-right']];
+
+function buildMosaicDocs(silent) {
+  const im = getImg(mosaicOpts.image);
+  if (!im) { if (!silent) toast('Photo still loading — try again in a second'); return null; }
+  return mosaicOrder().map((t, i) => {
+    const d = baseDoc(`Mosaic ${i + 1}/9 · post ${i === 0 ? '1st' : i === 1 ? '2nd' : i === 2 ? '3rd' : (i + 1) + 'th'} · ${POSNAME[t.r][t.c]}`);
+    d.id = uid();
+    d.bg = { ...d.bg, type: 'image', image: mosaicOpts.image, rect: mosaicRect(im, t.r, t.c, mosaicOpts), bright: 1, sat: 1, blur: 0, pad: '#0b0906' };
+    d.subject = { ...d.subject, on: false };
+    d.overlay = { type: 'none', color: '#000000', opacity: 0 };
+    d.grain = 0;
+    d.layers = [];
+    d.mosaic = { index: i, row: t.r, col: t.c, postOrder: i + 1 };
+    return d;
+  });
+}
+function renderMosaicPreview() {
+  const wrap = $('#mosPreview'); if (!wrap) return;
+  const docs = buildMosaicDocs(true); if (!docs) return;
+  wrap.innerHTML = '';
+  // shown in reading order so it reads as the finished grid, not the posting order
+  const byPos = {}; docs.forEach(d => byPos[d.mosaic.row + ',' + d.mosaic.col] = d);
+  for (let r = 0; r < MOS.ROWS; r++) for (let c = 0; c < MOS.COLS; c++) {
+    const d = byPos[r + ',' + c];
+    const cv = document.createElement('canvas');
+    const cssW = 96, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = cssW * dpr; cv.height = cssW * 4 / 3 * dpr;
+    // draw only the 3:4 crop window — what the profile grid actually shows
+    const x = cv.getContext('2d'); const s = cssW * dpr / MOS.W;
+    x.save(); x.translate(0, -(H - MOS.H) / 2 * s); render(x, d, s, null); x.restore();
+    cv.title = `${POSNAME[r][c]} · post ${d.mosaic.postOrder} of 9`;
+    wrap.appendChild(cv);
+  }
+  $('#mosPostOrder').textContent = mosaicOrder().map(t => POSNAME[t.r][t.c]).join(' → ');
+}
+async function generateMosaic() {
+  await preloadAssets([mosaicOpts.image]);
+  const docs = buildMosaicDocs(); if (!docs) return;
+  const btn = $('#btnMosaic'); btn.disabled = true;
+  const old = covers.filter(c => c.doc?.mosaic);
+  for (const o of old) { await store.deleteCover(o.id).catch(() => {}); }
+  covers = covers.filter(c => !c.doc?.mosaic);
+  settings.gridOrder = (settings.gridOrder || []).filter(id => covers.some(c => c.id === id));
+
+  const now = Date.now();
+  const recs = docs.map((d, i) => { d.createdAt = d.updatedAt = now + i; return { id: d.id, name: d.name, createdAt: d.createdAt, updatedAt: d.updatedAt, doc: d, versions: [] }; });
+  await store.saveCovers(recs);
+  covers = covers.concat(recs);
+  // oldest posts sit at the bottom of a profile, so the tiles go last in grid order
+  settings.gridOrder = (settings.gridOrder || []).filter(id => !recs.some(r => r.id === id)).concat(recs.map(r => r.id));
+  await store.saveSettings(settings).catch(() => {});
+  renderCoverList(); btn.disabled = false;
+  toast('9 mosaic tiles generated — post bottom-right first');
+}
+function bindMosaic() {
+  const sel = $('#mosImage');
+  const fill = () => { sel.innerHTML = [...assetsOf('photo'), ...assetsOf('bg')].map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join(''); sel.value = mosaicOpts.image; };
+  sel._fill = fill; fill();
+  sel.addEventListener('change', () => { mosaicOpts.image = sel.value; renderMosaicPreview(); });
+  $('#mosUpload').onclick = () => pickFile(async f => {
+    const rec = await store.putAsset(f, 'photo', f.name.replace(/\.[^.]+$/, '').slice(0, 40));
+    await new Promise(r => { const i = new Image(); i.onload = i.onerror = r; i.src = rec.url; imgCache[rec.id] = i; });
+    mosaicOpts.image = rec.id; fill(); refreshAssetSelects(); renderBgPick(); renderPool(); renderMosaicPreview();
+  });
+  [['mosZoom', 'zoom', v => v.toFixed(2) + '×'], ['mosX', 'offX', v => v.toFixed(2)], ['mosY', 'offY', v => v.toFixed(2)]]
+    .forEach(([id, key, fmt]) => { const e = $('#' + id), l = $('#' + id + 'V');
+      e.addEventListener('input', () => { mosaicOpts[key] = +e.value; l.textContent = fmt(+e.value); renderMosaicPreview(); }); l.textContent = fmt(+e.value); });
+  $('#btnMosaic').onclick = generateMosaic;
+}
+
 /* ---------------- views ---------------- */
 function switchView(v) {
   $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.view === v));
   $$('.view').forEach(s => s.classList.toggle('active', s.id === 'view-' + v));
-  if (v === 'grid') renderGrid(); if (v === 'cutout') renderCutoutView(); if (v === 'editor') renderAll();
+  if (v === 'grid') renderGrid(); if (v === 'cutout') renderCutoutView(); if (v === 'editor') renderAll(); if (v === 'batch') { renderBatchView(); renderMosaicPreview(); }
 }
 $$('nav.tabs button').forEach(b => b.onclick = () => switchView(b.dataset.view));
 document.fonts.addEventListener('loadingdone', () => { renderAll(); renderCoverList(); renderTemplates(); if ($('#view-grid').classList.contains('active')) renderGrid(); });
@@ -911,7 +1277,8 @@ document.fonts.addEventListener('loadingdone', () => { renderAll(); renderCoverL
     settings.profileEdited = true;
   } catch {}
   try { covers = await store.listCovers(); } catch (e) { console.warn(e); covers = []; }
-  refreshAssetSelects(); renderTemplates();
+  refreshAssetSelects(); renderTemplates(); bindBatch(); bindMosaic();
+  batchOpts.pool = assetsOf('photo').filter(p => p.still).map(p => p.id);
   if (covers.length) loadDoc([...covers].sort((a, b) => b.updatedAt - a.updatedAt)[0].doc);
   else { // seed a first set from the templates so the studio opens with something to look at
     for (const t of TEMPLATES.slice(0, 3)) { const d = t.make(); d.id = uid(); covers.push({ id: d.id, name: d.name, createdAt: d.createdAt, updatedAt: d.updatedAt - 1000, doc: d, versions: [] }); }

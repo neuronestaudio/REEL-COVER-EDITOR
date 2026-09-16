@@ -26,6 +26,18 @@ mock can be set to whichever account the covers are for.
 bundled in `mp/`, nothing uploaded), edge/feather/shrink controls, and background swapping.
 Transparent PNG cutouts made elsewhere can be uploaded instead.
 
+**Batch 72** — generates one cover per live post on the account, captioned from the
+cover-text index (`captions.js`) and set in the bold-sans look. The shoot stills in
+`assets/stills/` are spread evenly across the 72 and never repeat back to back; the eight
+posts with no overlay text are generated blank, ready for new copy. Every result is an
+ordinary editable cover.
+
+**3×3 mosaic** — nine reels whose profile-grid crop reassembles into one picture. Instagram
+crops reels to 3:4 from the centre, so the mosaic is laid out across nine 1080×1440 crop
+windows (3240×4320 overall) and each tile renders full-bleed 1080×1920 around its own window,
+so the reel still looks whole when opened. Tiles are named in posting order — bottom-right
+first, top-left last.
+
 **Export** — 1080×1920 or 2160×3840 PNG, JPG, or a ZIP of every cover.
 
 ## Storage
@@ -65,7 +77,9 @@ directory `.`.
 ```
 index.html   markup and styles
 app.js       renderer, editor, storage, export
-assets/      shipped photo + studio-grade cutout
+assets/      shipped photo, studio-grade cutout, mosaic source
+assets/stills/  day-1 REEL COVER stills (the default batch photo set)
+captions.js  the 72 cover captions, with hand-set line breaks
 mp/          MediaPipe Selfie Segmentation runtime and models (~12 MB)
 vendor/      JSZip (ZIP export)
 vercel.json  cache headers
