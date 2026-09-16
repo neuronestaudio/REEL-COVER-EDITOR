@@ -1052,6 +1052,7 @@ function renderGrid() {
   $('#phFollowing').textContent = settings.following || '0';
   PROFILE_FIELDS.forEach(([id, key]) => { const el = $('#' + id); if (el && document.activeElement !== el) el.value = settings[key] || ''; });
   $('#gShape916').setAttribute('aria-pressed', settings.shape !== '34'); $('#gShape34').setAttribute('aria-pressed', settings.shape === '34');
+  $$('#phTabs [data-shape]').forEach(t => t.classList.toggle('on', (t.dataset.shape === '34') === (settings.shape === '34')));
   const ig = $('#igrid'); ig.className = 'igrid' + (settings.shape === '34' ? ' crop34' : ''); ig.innerHTML = '';
   const order = (settings.gridOrder || []).map(id => covers.find(c => c.id === id)).filter(Boolean);
   $('#phPosts').textContent = settings.posts || order.length;
@@ -1098,6 +1099,8 @@ $('#gAvatar').onclick = () => pickFile(async f => { const rec = await store.putA
 $('#gAvatarClear').onclick = async () => { const id = settings.avatar; settings.avatar = null; saveSettingsSoon(); renderGrid(); if (id) await store.deleteAsset(id); };
 $('#gShape916').onclick = () => { settings.shape = '916'; saveSettingsSoon(); renderGrid(); };
 $('#gShape34').onclick = () => { settings.shape = '34'; saveSettingsSoon(); renderGrid(); };
+// the phone's own GRID / REELS tabs switch the tile shape too, like the real app
+$('#phTabs').onclick = e => { const s = e.target.closest('[data-shape]')?.dataset.shape; if (s && s !== (settings.shape === '34' ? '34' : '916')) { settings.shape = s; saveSettingsSoon(); renderGrid(); } };
 
 /* ---------------- cutout view ---------------- */
 const cut = { photo: 'photo', cutout: 'cutout', bg: null, candidate: null, candidateMask: null, seg: null };
@@ -1556,6 +1559,12 @@ function bindMosaic() {
    the library are kept — they only come off the grid, so nothing sits under the
    mosaic or shifts it out of line. */
 const DEMO_SET = 'rts-72-fraunces-1';
+/* How the demo is shown is gated separately from DEMO_SET, so the view can change
+   without regenerating the covers and wiping edits made to them. The mosaic is
+   built for the 3:4 profile-grid crop — in the 9:16 reels view each tile also
+   shows the 240px above and below its crop window, which repeats across the
+   seams — so the demo opens on the 3:4 grid. */
+const DEMO_VIEW = 'grid-34-1';
 async function seedDemoSet() {
   setStatus('loading the 72 covers…');
   await loadCoverFonts();
@@ -1598,6 +1607,7 @@ document.fonts.addEventListener('loadingdone', () => { renderAll(); renderCoverL
   batchOpts.pool = assetsOf('photo').filter(p => p.still).map(p => p.id);
   let seeded = false;
   if (settings.demoSet !== DEMO_SET) { try { seeded = await seedDemoSet(); } catch (e) { console.warn('demo set', e); } }
+  if (settings.demoView !== DEMO_VIEW) { settings.shape = '34'; settings.demoView = DEMO_VIEW; store.saveSettings(settings).catch(() => {}); }
   if (covers.length) loadDoc([...covers].sort((a, b) => b.updatedAt - a.updatedAt)[0].doc);
   else { // seed a first set from the templates so the studio opens with something to look at
     for (const t of TEMPLATES.slice(0, 3)) { const d = t.make(); d.id = uid(); covers.push({ id: d.id, name: d.name, createdAt: d.createdAt, updatedAt: d.updatedAt - 1000, doc: d, versions: [] }); }
