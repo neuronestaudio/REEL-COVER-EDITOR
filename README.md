@@ -51,10 +51,17 @@ bundled in `mp/`, nothing uploaded), edge/feather/shrink controls, and backgroun
 Transparent PNG cutouts made elsewhere can be uploaded instead.
 
 **Batch 72** — generates one cover per live post on the account, captioned from the
-cover-text index (`captions.js`) and set in the bold-sans look. The shoot stills in
-`assets/stills/` are spread evenly across the 72 and never repeat back to back; the eight
-posts with no overlay text are generated blank, ready for new copy. Every result is an
-ordinary editable cover.
+cover-text index (`captions.js`) and set in white Fraunces with a soft shadow. The shoot
+stills in `assets/stills/` are dealt evenly across the 72 by grid position, so no cover shares
+its still with the one beside it or the one above it; the eight posts with no overlay text are
+generated blank, ready for new copy. Every result is an ordinary editable cover.
+
+**Demo set** — the first time any browser opens the site it is given the full set: all 72
+covers plus the 3×3 mosaic, laid out on the profile grid (72 → 01, mosaic at the foot) and
+opened on that view. The still order is seeded, so everyone who opens the link sees the same
+grid. Covers already in that browser are kept but taken off the grid. Bump `DEMO_SET` in
+`app.js` to push a changed set to browsers that already have one. A link ending `#grid` always
+opens on the profile.
 
 **3×3 mosaic** — nine reels whose profile-grid crop reassembles into one picture. Instagram
 crops reels to 3:4 from the centre, so the mosaic is laid out across nine 1080×1440 crop

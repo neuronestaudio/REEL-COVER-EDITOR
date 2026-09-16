@@ -1203,6 +1203,56 @@ function assort(pool, count, doShuffle) {
   return out;
 }
 
+/* Stills are dealt by GRID position, not post number. The profile shows newest
+   first in rows of three, so a cover's neighbours are the one before it and the
+   one above it; neither may share its still. Every still gets an equal share,
+   and picks favour the stills with the most left so the tail never runs out of
+   legal options. `rand` is seeded for the demo so every browser that opens the
+   link sees the same grid. Returns one still per grid slot, slot 0 = newest. */
+function assortGrid(pool, count, cols, rand) {
+  if (!pool.length) return [];
+  const quota = Math.ceil(count / pool.length);
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const left = new Map(pool.map(p => [p, quota])), out = [];
+    for (let i = 0; i < count; i++) {
+      const ok = pool.filter(p => left.get(p) > 0 && p !== out[i - 1] && p !== out[i - cols]);
+      if (!ok.length) break;
+      const most = Math.max(...ok.map(p => left.get(p)));
+      const top = ok.filter(p => left.get(p) >= most - 1);
+      const pick = top[Math.floor(rand() * top.length)];
+      out.push(pick); left.set(pick, left.get(pick) - 1);
+    }
+    if (out.length === count) return out;
+  }
+  return assort(pool, count, true);
+}
+function seededRand(seed) {
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+/* Still for each entry of COVER_TEXT (oldest first), dealt across the grid. */
+function batchStills(o, rand) {
+  const n = COVER_TEXT.length;
+  if (!o.shuffle) return assort(o.pool, n, false);
+  const grid = assortGrid(o.pool, n, 3, rand || Math.random);
+  return COVER_TEXT.map((c, i) => grid[n - 1 - i]);
+}
+function coverRecord(d) { return { id: d.id, name: d.name, createdAt: d.createdAt, updatedAt: d.updatedAt, doc: d, versions: [] }; }
+function buildBatchRecs(o, stills) {
+  const now = Date.now();
+  return COVER_TEXT.map((c, i) => { const d = buildBatchDoc(c, stills[i], o); d.createdAt = d.updatedAt = now + i; return coverRecord(d); });
+}
+/* The headline is measured to fit, so the face has to be real before layout. */
+function loadCoverFonts() {
+  return Promise.allSettled(['600 100px', 'italic 400 100px', '400 100px'].map(f => document.fonts.load(`${f} "${COVER_FONT}"`)));
+}
+/* Profile order is newest first: the 72 run 72 → 01, then the mosaic sits under
+   them as the nine oldest posts. Its last-posted tile is the top-left one, so
+   tiles go in reverse posting order — in posting order the picture lands
+   rotated 180°. */
+function mosaicGridIds(recs) { return [...recs].sort((a, b) => b.doc.mosaic.postOrder - a.doc.mosaic.postOrder).map(r => r.id); }
+function batchGridIds(recs) { return [...recs].sort((a, b) => b.doc.batch.n - a.doc.batch.n).map(r => r.id); }
+
 /* getImg is lazy, so anything that RENDERS (rather than just schedules a
    repaint) has to wait for the decode first. */
 function preloadAssets(ids) {
@@ -1229,17 +1279,20 @@ function fitMain(l, maxLines) {
   for (let s = l.size; s >= 54; s -= 4) { l.size = s; if (measureLayer(l).lines.length <= maxLines) return l; }
   return l;
 }
-/* Bold-sans era: white Poppins with a heavy dark outline, centred, no box.
+/* Cover look: the editor's own caption face — white Fraunces 600, tight tracking,
+   a soft shadow instead of an outline — centred, no box. A tracked-caps label
+   above and an italic sub-line below, both Fraunces, so the set stays one family.
    The block is vertically centred on `pos` so kicker/headline/sub stay together. */
-function boldSansLayers(c, o) {
+const COVER_FONT = 'Fraunces';
+function coverLayers(c, o) {
   const layers = [];
   const mk = (over) => newText(Object.assign({
-    font: 'Poppins', align: 'center', x: 0.5, color: '#ffffff', box: 'none',
-    boxColor: '#0d0b08', shadow: 0.38, behind: false,
+    font: COVER_FONT, align: 'center', x: 0.5, color: '#ffffff', box: 'none',
+    boxColor: '#0d0b08', outline: 0, behind: false,
   }, over));
-  const kicker = c.kicker ? mk({ text: c.kicker, weight: 600, size: 30, track: 0.18, line: 1.2, width: 0.86, upper: true, outline: 5, color: '#f2efe8' }) : null;
-  const main = fitMain(mk({ text: c.main, weight: 800, size: o.size, track: -0.022, line: 1.06, width: 0.86, outline: Math.round(o.size / 13) }), 4);
-  const sub = c.sub ? mk({ text: c.sub, weight: 600, size: Math.round(o.size * 0.37), track: 0, line: 1.22, width: 0.8, outline: Math.round(o.size / 22), color: '#ece7dc' }) : null;
+  const kicker = c.kicker ? mk({ text: c.kicker, weight: 600, size: 32, track: 0.16, line: 1.2, width: 0.86, upper: true, shadow: 0.7, color: '#f2efe8' }) : null;
+  const main = fitMain(mk({ text: c.main, weight: 600, size: o.size, track: -0.02, line: 1.02, width: 0.86, shadow: 0.62 }), 4);
+  const sub = c.sub ? mk({ text: c.sub, weight: 400, italic: true, size: Math.round(o.size * 0.42), track: 0, line: 1.18, width: 0.8, shadow: 0.7, color: '#ece7dc' }) : null;
 
   const gap = main.size * 0.34;
   const kH = kicker ? measureLayer(kicker).height : 0;
@@ -1265,7 +1318,7 @@ function buildBatchDoc(c, photoId, o) {
   d.subject = { ...d.subject, on: false };
   d.overlay = { type: 'vignette', color: '#000000', opacity: o.tint };
   d.grain = 0.05;
-  d.layers = c.empty ? [] : boldSansLayers(c, o);
+  d.layers = c.empty ? [] : coverLayers(c, o);
   d.batch = { n: c.n, date: c.date, era: c.era, source: c.source, flag: c.flag, empty: c.empty };
   return d;
 }
@@ -1323,8 +1376,7 @@ async function generateBatch() {
   const btn = $('#btnGenerate'), prog = $('#batchProg'), bar = $('i', prog);
   btn.disabled = true; prog.classList.add('on'); bar.style.width = '2%';
   $('#batchMsg').textContent = 'loading fonts…';
-  // the headline is measured, so Poppins must be real before anything is laid out
-  await Promise.allSettled([500, 600, 800].map(w => document.fonts.load(`${w} 100px "Poppins"`)));
+  await loadCoverFonts();
   $('#batchMsg').textContent = 'loading photos…';
   await preloadAssets(batchOpts.pool);
 
@@ -1334,21 +1386,14 @@ async function generateBatch() {
     covers = covers.filter(c => !c.doc?.batch);
     settings.gridOrder = (settings.gridOrder || []).filter(id => covers.some(c => c.id === id));
   }
-  batchOpts.seq = assort(batchOpts.pool, COVER_TEXT.length, batchOpts.shuffle);
-
-  const now = Date.now(), recs = [], docs = [];
-  COVER_TEXT.forEach((c, i) => {
-    const d = buildBatchDoc(c, batchOpts.seq[i], batchOpts);
-    d.createdAt = d.updatedAt = now + i;
-    docs.push(d);
-    recs.push({ id: d.id, name: d.name, createdAt: d.createdAt, updatedAt: d.updatedAt, doc: d, versions: [] });
-  });
+  batchOpts.seq = batchStills(batchOpts);
+  const recs = buildBatchRecs(batchOpts, batchOpts.seq), docs = recs.map(r => r.doc);
 
   $('#batchMsg').textContent = 'saving…';
   await store.saveCovers(recs, n => { bar.style.width = Math.round(4 + n / recs.length * 96) + '%'; $('#batchMsg').textContent = `${n} of ${recs.length} saved`; });
   covers = covers.concat(recs);
   // newest-first on a profile grid, so the set reads 72 → 01 top-left
-  settings.gridOrder = recs.map(r => r.id).reverse().concat(settings.gridOrder || []);
+  settings.gridOrder = batchGridIds(recs).concat(settings.gridOrder || []);
   await store.saveSettings(settings).catch(() => {});
 
   renderBatchPreviews(docs); renderCoverList();
@@ -1481,7 +1526,7 @@ async function generateMosaic() {
   await store.saveCovers(recs);
   covers = covers.concat(recs);
   // oldest posts sit at the bottom of a profile, so the tiles go last in grid order
-  settings.gridOrder = (settings.gridOrder || []).filter(id => !recs.some(r => r.id === id)).concat(recs.map(r => r.id));
+  settings.gridOrder = (settings.gridOrder || []).filter(id => !recs.some(r => r.id === id)).concat(mosaicGridIds(recs));
   await store.saveSettings(settings).catch(() => {});
   renderCoverList(); btn.disabled = false;
   toast('9 mosaic tiles generated — post bottom-right first');
@@ -1500,6 +1545,34 @@ function bindMosaic() {
     .forEach(([id, key, fmt]) => { const e = $('#' + id), l = $('#' + id + 'V');
       e.addEventListener('input', () => { mosaicOpts[key] = +e.value; l.textContent = fmt(+e.value); renderMosaicPreview(); }); l.textContent = fmt(+e.value); });
   $('#btnMosaic').onclick = generateMosaic;
+}
+
+/* ---------------- demo set ----------------
+   This link gets shown to clients, and covers only exist in the browser that
+   made them, so a first visit would otherwise open on an empty studio. Every
+   browser is given the full Return to Self set once: the 72 covers and the 3x3
+   mosaic, placed on the profile grid with the mosaic at its foot. Bump DEMO_SET
+   to push a changed set to browsers that already hold one. Covers already in
+   the library are kept — they only come off the grid, so nothing sits under the
+   mosaic or shifts it out of line. */
+const DEMO_SET = 'rts-72-fraunces-1';
+async function seedDemoSet() {
+  setStatus('loading the 72 covers…');
+  await loadCoverFonts();
+  const o = { ...batchOpts, shuffle: true };
+  await preloadAssets([mosaicOpts.image, ...o.pool]);
+  const mos = buildMosaicDocs(true); if (!mos || !o.pool.length) return false;
+  const batch = buildBatchRecs(o, batchStills(o, seededRand(72)));
+  const oldest = Date.now() - 60000;
+  const tiles = mos.map((d, i) => { d.createdAt = d.updatedAt = oldest + i; return coverRecord(d); });
+  // replace an earlier generated set rather than stacking a second copy
+  for (const c of covers.filter(c => c.doc?.batch || c.doc?.mosaic)) await store.deleteCover(c.id).catch(() => {});
+  covers = covers.filter(c => !c.doc?.batch && !c.doc?.mosaic).concat(batch, tiles);
+  await store.saveCovers([...batch, ...tiles]);
+  settings.gridOrder = [...batchGridIds(batch), ...mosaicGridIds(tiles)];
+  settings.demoSet = DEMO_SET;
+  await store.saveSettings(settings).catch(() => {});
+  return true;
 }
 
 /* ---------------- views ---------------- */
@@ -1523,6 +1596,8 @@ document.fonts.addEventListener('loadingdone', () => { renderAll(); renderCoverL
   try { covers = await store.listCovers(); } catch (e) { console.warn(e); covers = []; }
   refreshAssetSelects(); renderTemplates(); bindBatch(); bindMosaic();
   batchOpts.pool = assetsOf('photo').filter(p => p.still).map(p => p.id);
+  let seeded = false;
+  if (settings.demoSet !== DEMO_SET) { try { seeded = await seedDemoSet(); } catch (e) { console.warn('demo set', e); } }
   if (covers.length) loadDoc([...covers].sort((a, b) => b.updatedAt - a.updatedAt)[0].doc);
   else { // seed a first set from the templates so the studio opens with something to look at
     for (const t of TEMPLATES.slice(0, 3)) { const d = t.make(); d.id = uid(); covers.push({ id: d.id, name: d.name, createdAt: d.createdAt, updatedAt: d.updatedAt - 1000, doc: d, versions: [] }); }
@@ -1532,5 +1607,7 @@ document.fonts.addEventListener('loadingdone', () => { renderAll(); renderCoverL
   }
   setStatus('saved in this browser', 'ok');
   getImg('photo'); getImg('cutout');
+  // a first visit, or a link ending #grid, opens straight on the profile
+  if (seeded || location.hash === '#grid') switchView('grid');
 })();
 })();
