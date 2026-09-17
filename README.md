@@ -71,13 +71,29 @@ placed at the top of the profile grid. Copy is in `statics.js`, the plates in `a
 The **Return to Self static** template starts a new cover in the same look. Bump `STATIC_SET`
 in `app.js` to push a changed set.
 
-**3×3 mosaic** — nine reels whose profile-grid crop reassembles into one picture. Instagram
+**3×3 mosaic** — on the Profile grid tab: drop or upload a photo and it is cut across nine
+reels at the foot of the grid, with zoom, pan and a preview of the finished block. Instagram
 crops reels to 3:4 from the centre, so the mosaic is laid out across nine 1080×1440 crop
 windows (3240×4320 overall) and each tile renders full-bleed 1080×1920 around its own window,
-so the reel still looks whole when opened. Tiles are named in posting order — bottom-right
-first, top-left last.
+so the reel still looks whole when opened. Each photo keeps its own mosaic, so several can sit on
+the grid at once; re-cutting one leaves the others alone. **Export the 9 tiles as a ZIP** names
+the files in posting order — bottom-right first, top-left last — with a `POST-ORDER.txt`.
+Two ship built in: the candlelight still and the match photo behind the "slowing down time"
+cover (C14). Bump `MOSAIC_SET` in `app.js` to push a changed cut of the match mosaic.
 
-**Export** — 1080×1920 or 2160×3840 PNG, JPG, or a ZIP of every cover.
+**Cutout across tiles** — also on the Profile grid tab: drop a photo (the subject is cut out
+on-device) or a transparent PNG, choose a block up to three tiles wide and as many rows as you
+like, pick its top-left tile, then size and pan the figure over the block and **Lay across the
+tiles**. Nothing new in the renderer: each tile under the block gets ordinary subject settings
+that put its slice in place, so opening any tile in the editor shows its piece as the subject,
+and it exports like any other cover. Re-lay to move it; **Take it off the tiles** puts back
+whatever subject each tile had before.
+
+**Select and export** — click tiles on the Profile grid (or tick covers in the Covers panel)
+to select a set; **Export selected** renders just those, one as a PNG, more as a ZIP, at the
+size chosen in the header.
+
+**Export** — 1080×1920 or 2160×3840 PNG, JPG, the selected covers, or a ZIP of every cover.
 
 ## Storage
 
