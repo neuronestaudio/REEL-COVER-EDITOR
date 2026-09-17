@@ -91,8 +91,10 @@ const BUILTIN = {
   rtsC15: { id: 'rtsC15', kind: 'photo', name: 'Static C15, flame at the eye', url: 'assets/statics/rts-c15.jpg', builtin: true, rts: true },
   rtsC17: { id: 'rtsC17', kind: 'photo', name: 'Static C17, shoji frontal', url: 'assets/statics/rts-c17.jpg', builtin: true, rts: true },
   rtsC18: { id: 'rtsC18', kind: 'photo', name: 'Static C18, the chair', url: 'assets/statics/rts-c18.jpg', builtin: true, rts: true },
-  // static set v3 — the empty shoji room from the hero film (10.72 s), 4x upscale, scrim baked in
-  rtsRoom: { id: 'rtsRoom', kind: 'photo', name: 'Static A5, the room', url: 'assets/statics/rts-room.jpg', builtin: true, rts: true },
+  // static set v3 — the "if this is you" mosaic: one 3240x4800 picture (the match at the mouth, sorter set once) sliced into nine tiles
+  rtsMosaic: { id: 'rtsMosaic', kind: 'photo', name: 'Static M, if this is you (3x3 mosaic picture)', url: 'assets/statics/rts-mosaic-if-this-is-you.jpg', builtin: true, rts: true },
+  // the empty shoji room from the hero film (10.72 s), 4x upscale, scrim baked in — kept as a background to remix
+  rtsRoom: { id: 'rtsRoom', kind: 'photo', name: 'The room (hero film, 10.72 s)', url: 'assets/statics/rts-room.jpg', builtin: true, rts: true },
   // Harrison's marks, for the signature strip
   rtsMark: { id: 'rtsMark', kind: 'logo', name: 'Harrison ensō mark, white', url: 'assets/brand/mark-s-white.png', builtin: true },
   rtsShinbukan: { id: 'rtsShinbukan', kind: 'logo', name: 'Shinbukan crest', url: 'assets/brand/mark-shinbukan.png', builtin: true },
@@ -1631,8 +1633,9 @@ async function seedDemoSet() {
 
 
 /* ---------------- Return to Self static set ----------------
-   Three sets, 45 covers, newest first: v3 (17 Sep), nine boards on the
-   landing page's "if this is you" lines over the empty shoji room; v2 (17 Sep),
+   Three sets, 45 covers, newest first: v3 (17 Sep), a 3x3 mosaic, one picture
+   with the landing page's "if this is you" sorter set once, sliced into nine
+   tiles like the batch mosaic (the door boards it replaced are gone); v2 (17 Sep),
    18 boards on the self-worth pillar built on the 26 Aug production-day stills;
    v1, the 18 statics cut from Nathan's 16 Sep videos, one per video. All
    rebuilt here as ordinary editable covers so the copy, plates and marks are
@@ -1641,7 +1644,7 @@ async function seedDemoSet() {
    Shinbukan and Seizanji crests. Copy lives in statics.js; plates in
    assets/statics; marks in assets/brand. The block is anchored above the
    3:4 grid crop so the headline survives the profile view. */
-const STATIC_SET = 'rts-statics-v3';
+const STATIC_SET = 'rts-statics-v4';
 const RTS = { ink: '#14120e', red: '#b5432f', white: '#fbf7ef', font: 'Fraunces' };
 function staticHeadSize(t) { const n = t.length; return n <= 32 ? 92 : n <= 62 ? 64 : n <= 92 ? 54 : 47; }
 function staticLayers(s) {
@@ -1678,6 +1681,19 @@ function staticLayers(s) {
 }
 function buildStaticDoc(s) {
   const d = baseDoc(`${s.id} \u00b7 ${s.name}`);
+  if (s.layout === 'mosaic') {
+    // one tile of a 3x3 profile-grid mosaic: the picture (type included) is the asset,
+    // placed with the same rect maths as the batch mosaic, no layers of its own
+    const im = getImg(s.bg);
+    d.bg = { ...d.bg, type: 'image', image: s.bg, rect: im ? mosaicRect(im, s.tile.r, s.tile.c, { zoom: 1, offX: 0, offY: 0 }) : undefined,
+             fit: 'fill', scale: 1, x: 0, y: 0, blur: 0, bright: 1, sat: 1, pad: '#0b0906' };
+    d.subject = { ...d.subject, on: false };
+    d.overlay = { type: 'none', color: '#000000', opacity: 0 };
+    d.grain = 0;
+    d.layers = [];
+    d.rts = { id: s.id, set: STATIC_SET, layout: s.layout, tile: s.tile };
+    return d;
+  }
   d.bg = { ...d.bg, type: 'image', image: s.bg, fit: 'fill', scale: 1, x: 0, y: 0, blur: 0, bright: 1, sat: 1, pad: RTS.ink };
   d.subject = { ...d.subject, on: false };
   d.overlay = { type: 'bottom', color: '#0c0905', opacity: s.layout === 'cover' || s.layout === 'archival' ? 0.35 : 0 };
@@ -1694,6 +1710,8 @@ async function seedStaticSet() {
   const list = window.__RTS_STATICS__ || []; if (!list.length) return false;
   setStatus('loading the static set\u2026');
   await Promise.allSettled(['500 100px', '600 100px', 'italic 400 100px'].map(f => document.fonts.load(`${f} "${RTS.font}"`)));
+  // mosaic tiles need the picture's natural size for their rect
+  await preloadAssets([...new Set(list.filter(s => s.layout === 'mosaic').map(s => s.bg))]).catch(() => {});
   // newest in the library, so the studio opens on A1.1 (Date.now alone can tie with a batch seeded in the same tick)
   const now = Math.max(Date.now(), ...covers.map(c => c.updatedAt || 0)) + 1000;
   const recs = list.map((s, i) => { const d = buildStaticDoc(s); d.id = uid(); d.createdAt = d.updatedAt = now + (list.length - i); return coverRecord(d); });
