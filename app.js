@@ -912,9 +912,12 @@ function syncSpanUI() {
   const key = live ? `${l.id}:${tSel.s}:${tSel.e}` : '';
   if (key !== tHiKey) { tHiKey = key; renderAll(); }   // the poster highlights the same range
 }
-/* Never pull focus back to the box from here: the native colour picker closes
-   the moment its input loses focus, which cut every pick off at its first tick. */
-function applySpan(c) {
+/* Named apart from the tile-span `applySpan` below: both sit in the same scope,
+   and a second `function applySpan` silently replaced this one, which is how
+   part colour stopped working. Never pull focus back to the box from here: the
+   native colour picker closes the moment its input loses focus, which cut every
+   pick off at its first tick. */
+function applyPartColor(c) {
   const l = T(); if (!l || !tSel) return;
   l.spans = clipSpans(normSpans(l), tSel.s, tSel.e).concat([{ s: tSel.s, e: tSel.e, color: c }]).sort((a, b) => a.s - b.s);
   renderAll(); renderLayers(); syncSpanUI();
@@ -922,8 +925,8 @@ function applySpan(c) {
 $('#tSpanSwatches').innerHTML = SWATCH.slice(0, 8).map(c => `<button class="sw" style="background:${c};width:16px;height:16px" data-c="${c}" title="${c}"></button>`).join('');
 // Hold the selection: a mousedown on these controls would otherwise blur the textarea.
 ['#tSpanSwatches', '#tSpanClear'].forEach(s => $(s).addEventListener('mousedown', e => e.preventDefault()));
-$('#tSpanSwatches').onclick = e => { const c = e.target.dataset.c; if (c && tSel) { pushUndo(); applySpan(c); scheduleSave(); } };
-$('#tSpanColor').addEventListener('input', e => { if (!tSpanBefore) tSpanBefore = snapshot(); applySpan(e.target.value); });
+$('#tSpanSwatches').onclick = e => { const c = e.target.dataset.c; if (c && tSel) { pushUndo(); applyPartColor(c); scheduleSave(); } };
+$('#tSpanColor').addEventListener('input', e => { if (!tSpanBefore) tSpanBefore = snapshot(); applyPartColor(e.target.value); });
 $('#tSpanColor').addEventListener('change', () => { if (tSpanBefore) { undoStack.push(tSpanBefore); redoStack = []; updateUndoBtns(); tSpanBefore = null; scheduleSave(); } });
 $('#tSpanClear').onclick = () => {
   const l = T(); if (!l) return;
