@@ -22,7 +22,10 @@ moving it.
 **Part colour** — select any words inside a caption and give just those a different colour, so
 one heading can carry an accent without being split into separate layers. Select in the text
 box, then pick from **Part colour**; **Clear** returns the selection to the layer colour, or
-resets the whole layer when nothing is selected. The colour is stored as a range over the text
+resets the whole layer when nothing is selected. The selected words stay highlighted in the box
+and on the poster itself while you pick, including inside the native colour picker, which
+takes focus away from the box (Chrome otherwise hides a textarea's selection the moment it
+loses focus). The colour is stored as a range over the text
 rather than baked into it, so it follows the words as the caption is edited, and survives word
 wrap, CAPS and re-alignment.
 

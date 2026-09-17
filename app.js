@@ -270,7 +270,7 @@ function drawOverlay(x, doc) {
   }
   x.restore();
 }
-function drawText(x, l) {
+function drawText(x, l, hi) {
   x.save();
   x.font = fontString(l); x.letterSpacing = `${l.track * l.size}px`; x.textBaseline = 'alphabetic';
   const text = l.upper ? upperKeepLen(l.text) : l.text;
@@ -293,6 +293,27 @@ function drawText(x, l) {
       if (l.box === 'pill') { roundRect(x, lx - pad * 1.4, ly + lh * .08, lw + pad * 2.8, lh * .92, lh); x.fill(); }
       else { roundRect(x, lx - pad * .5, ly + lh * .16, lw + pad, lh * .78, 4); x.fill(); }
     });
+  }
+  /* Preview only: the range selected in the text box, painted behind the glyphs
+     like an OS text selection so the part about to be coloured reads on the
+     poster. A wrap-inserted space (i < 0) counts only between two selected
+     characters. Exports never receive `hi`, so they are untouched. */
+  if (hi && hi.e > hi.s) {
+    x.save(); x.fillStyle = 'rgba(72,140,255,.6)';
+    lines.forEach((ln, i) => {
+      const lw = widths[i]; const lx = l.align === 'left' ? left : l.align === 'right' ? left + bw - lw : left + (bw - lw) / 2;
+      const ty = top + i * lh + lh * 0.5 + l.size * 0.34;
+      const inSel = e => e.i >= hi.s && e.i < hi.e;
+      const on = ln.idx.map((e, k) => e.i < 0 ? (k > 0 && k + 1 < ln.idx.length && inSel(ln.idx[k - 1]) && inSel(ln.idx[k + 1])) : inSel(e));
+      for (let a = 0; a < on.length;) {
+        if (!on[a]) { a++; continue; }
+        let b = a; while (b < on.length && on[b]) b++;
+        const ox = lx + (a ? x.measureText(ln.text.slice(0, a)).width : 0), w = x.measureText(ln.text.slice(a, b)).width;
+        roundRect(x, ox - l.size * 0.04, ty - l.size * 0.76, w + l.size * 0.08, l.size * 0.98, l.size * 0.06); x.fill();
+        a = b;
+      }
+    });
+    x.restore();
   }
   /* Runs are drawn left-aligned from the line's own left edge rather than from
      the layer's alignment anchor. For a single-colour line the two are the same
@@ -327,11 +348,11 @@ function drawLogo(x, l) {
   else { x.strokeStyle = 'rgba(255,255,255,.5)'; x.setLineDash([12, 10]); x.lineWidth = 3; x.strokeRect(X, Y, w, h); x.font = '500 28px "JetBrains Mono"'; x.fillStyle = '#fff'; x.textAlign = 'center'; x.fillText('LOGO', X + w / 2, Y + h / 2 + 10); }
   x.restore(); return { x: X, y: Y, w, h };
 }
-function render(ctx, doc, scale, boxes) {
+function render(ctx, doc, scale, boxes, ui) {
   ctx.save(); ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.clearRect(0, 0, W, H);
   drawBackground(ctx, doc);
-  const draw = l => { const b = l.type === 'text' ? drawText(ctx, l) : l.type === 'rule' ? drawRule(ctx, l) : drawLogo(ctx, l); if (boxes) boxes[l.id] = b; };
+  const draw = l => { const b = l.type === 'text' ? drawText(ctx, l, ui && ui.id === l.id ? ui : null) : l.type === 'rule' ? drawRule(ctx, l) : drawLogo(ctx, l); if (boxes) boxes[l.id] = b; };
   doc.layers.filter(l => l.behind).forEach(draw);
   drawSubject(ctx, doc); if (boxes) { const sb = subjectBox(doc); if (sb && doc.subject.on) boxes.__subject = sb; }
   drawOverlay(ctx, doc);
@@ -520,12 +541,16 @@ function stageZoom() {
   const st = $('#stage'); const z = Math.min((st.clientHeight - 40) / H, (st.clientWidth - 40) / W) * zoomMul;
   return Math.max(0.08, z);
 }
+/* The preview alone paints the text box's live selection onto the poster, so
+   the words about to be part-coloured can be seen on the cover itself. The
+   accessor is filled in by the part-colour code further down. */
+let uiHi = () => null;
 function renderPreview() {
   const z = stageZoom(), cssW = Math.round(W * z), cssH = Math.round(H * z);
   preview.style.width = cssW + 'px'; preview.style.height = cssH + 'px';
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   if (preview.width !== Math.round(cssW * dpr)) { preview.width = Math.round(cssW * dpr); preview.height = Math.round(cssH * dpr); }
-  boxes = {}; render(pctx, doc, z * dpr, boxes);
+  boxes = {}; render(pctx, doc, z * dpr, boxes, uiHi());
   $('#zoomLbl').innerHTML = `<b>${Math.round(z * 100)}%</b>`;
   drawSelection(z);
 }
@@ -830,8 +855,8 @@ $('#tSwatches').onclick = e => { const c = e.target.dataset.c, l = T(); if (c &&
    heading can carry an accent without being split into separate layers. The
    selection is mirrored into `tSel` because clicking a swatch moves focus, and
    it is reset whenever the inspector switches to a different layer. */
-let tSel = null, tSelFor = null, tSpanBefore = null;
-const tTextEl = $('#tText');
+let tSel = null, tSelFor = null, tSpanBefore = null, tHiKey = '';
+const tTextEl = $('#tText'), tHiEl = $('#tTextHi');
 function captureSel() {
   const a = tTextEl.selectionStart, b = tTextEl.selectionEnd;
   tSel = b > a ? { s: a, e: b } : null;
@@ -839,6 +864,18 @@ function captureSel() {
 }
 ['keyup', 'mouseup', 'select', 'focus', 'click', 'input'].forEach(ev => tTextEl.addEventListener(ev, captureSel));
 document.addEventListener('selectionchange', () => { if (document.activeElement === tTextEl) captureSel(); });
+/* Chrome stops painting a textarea's selection the moment it loses focus, so
+   opening the colour picker (which takes focus) made the chosen words vanish.
+   A mirror behind the transparent box repaints the held range instead. */
+function syncTextHi() {
+  const v = tTextEl.value, live = !!(T() && tSel);
+  if (live) tHiEl.innerHTML = escapeHtml(v.slice(0, tSel.s)) + '<mark>' + escapeHtml(v.slice(tSel.s, tSel.e)) + '</mark>' + escapeHtml(v.slice(tSel.e));
+  else tHiEl.textContent = '';
+  tHiEl.style.paddingRight = (8 + Math.max(0, tTextEl.offsetWidth - tTextEl.clientWidth - 2)) + 'px'; // wrap in step with the scrollbar
+  tHiEl.scrollTop = tTextEl.scrollTop;
+}
+tTextEl.addEventListener('scroll', () => { tHiEl.scrollTop = tTextEl.scrollTop; });
+uiHi = () => { const l = T(); return l && tSel ? { id: l.id, s: tSel.s, e: tSel.e } : null; };
 function syncSpanUI() {
   const l = T(), live = !!(l && tSel);
   $('#tSpanRow').style.opacity = live ? 1 : .45;
@@ -849,12 +886,16 @@ function syncSpanUI() {
     ? `Colouring “${(l.upper ? upperKeepLen(l.text) : l.text).slice(tSel.s, tSel.e)}”.`
     : n ? `${n} coloured ${n === 1 ? 'part' : 'parts'} on this layer. Select words above to change them, or Clear to reset all.`
       : 'Select words in the box above, then pick a colour to accent just that part.';
+  syncTextHi();
+  const key = live ? `${l.id}:${tSel.s}:${tSel.e}` : '';
+  if (key !== tHiKey) { tHiKey = key; renderAll(); }   // the poster highlights the same range
 }
+/* Never pull focus back to the box from here: the native colour picker closes
+   the moment its input loses focus, which cut every pick off at its first tick. */
 function applySpan(c) {
   const l = T(); if (!l || !tSel) return;
   l.spans = clipSpans(normSpans(l), tSel.s, tSel.e).concat([{ s: tSel.s, e: tSel.e, color: c }]).sort((a, b) => a.s - b.s);
   renderAll(); renderLayers(); syncSpanUI();
-  tTextEl.focus(); tTextEl.setSelectionRange(tSel.s, tSel.e);
 }
 $('#tSpanSwatches').innerHTML = SWATCH.slice(0, 8).map(c => `<button class="sw" style="background:${c};width:16px;height:16px" data-c="${c}" title="${c}"></button>`).join('');
 // Hold the selection: a mousedown on these controls would otherwise blur the textarea.
@@ -867,7 +908,6 @@ $('#tSpanClear').onclick = () => {
   pushUndo();
   l.spans = tSel ? clipSpans(normSpans(l), tSel.s, tSel.e) : [];
   commit(); renderLayers(); syncSpanUI();
-  if (tSel) { tTextEl.focus(); tTextEl.setSelectionRange(tSel.s, tSel.e); }
 };
 const boxChips = $('[data-box]').parentElement; bound.push(bindChips(boxChips.id || (boxChips.id = 'boxChips'), 'box', () => T()?.box, v => { const l = T(); if (l) l.box = v; }));
 bound.push(bindColor('tBoxColor', () => T()?.boxColor, v => { const l = T(); if (l) l.boxColor = v; }));
