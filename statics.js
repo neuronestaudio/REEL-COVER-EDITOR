@@ -1,9 +1,93 @@
-/* Return to Self static set v1 — 16 Sep 2026.
+/* Return to Self static sets: v3 (17 Sep 2026, M.1–M.9, the "if this is you" mosaic), v2 (17 Sep 2026, A4 / C9–C18) and v1 (16 Sep 2026, A1–A3 / C1–C8), newest first.
+   v1 — 16 Sep 2026.
    One board per video from Nathan's shoot: three ad concepts (hook-matched
    variants) and eight content pieces. Copy is verbatim from the transcripts
    except A1.4's sub and C6's headline, which are paraphrases awaiting sign-off.
    `bg` names a built-in still in assets/statics (photo top, ink below). */
 window.__RTS_STATICS__ = [
+  /* ---- Static set v3 — "if this is you", 17 Sep 2026: a 3x3 profile-grid mosaic.
+     One 3240x4800 picture (the match at the mouth, 26 Aug still DSC08872, the landing page's sorter set once
+     across the bottom row) sliced into nine reel covers the way the batch mosaic is. Listed in reading order
+     so the grid assembles; post them bottom-right first. The six pattern lines ride in the post captions. */
+  { id: 'M.1', name: 'If this is you · top-left · post 9th', layout: 'mosaic', bg: 'rtsMosaic', tile: { r: 0, c: 0 }, kicker: '', head: '', sub: '', cta: '' },
+  { id: 'M.2', name: 'If this is you · top-centre · post 8th', layout: 'mosaic', bg: 'rtsMosaic', tile: { r: 0, c: 1 }, kicker: '', head: '', sub: '', cta: '' },
+  { id: 'M.3', name: 'If this is you · top-right · post 7th', layout: 'mosaic', bg: 'rtsMosaic', tile: { r: 0, c: 2 }, kicker: '', head: '', sub: '', cta: '' },
+  { id: 'M.4', name: 'If this is you · middle-left · post 6th', layout: 'mosaic', bg: 'rtsMosaic', tile: { r: 1, c: 0 }, kicker: '', head: '', sub: '', cta: '' },
+  { id: 'M.5', name: 'If this is you · centre · post 5th', layout: 'mosaic', bg: 'rtsMosaic', tile: { r: 1, c: 1 }, kicker: '', head: '', sub: '', cta: '' },
+  { id: 'M.6', name: 'If this is you · middle-right · post 4th', layout: 'mosaic', bg: 'rtsMosaic', tile: { r: 1, c: 2 }, kicker: '', head: '', sub: '', cta: '' },
+  { id: 'M.7', name: 'If this is you · bottom-left · post 3rd', layout: 'mosaic', bg: 'rtsMosaic', tile: { r: 2, c: 0 }, kicker: '', head: '', sub: '', cta: '' },
+  { id: 'M.8', name: 'If this is you · bottom-centre · post 2nd', layout: 'mosaic', bg: 'rtsMosaic', tile: { r: 2, c: 1 }, kicker: '', head: '', sub: '', cta: '' },
+  { id: 'M.9', name: 'If this is you · bottom-right · post 1st', layout: 'mosaic', bg: 'rtsMosaic', tile: { r: 2, c: 2 }, kicker: '', head: '', sub: '', cta: '' },
+
+  /* ---- Static set v2 — self-worth, 17 Sep 2026.
+     Eighteen boards on the 26 Aug production-day stills (shoji room, the match), copy verbatim from
+     Harrison's Sep 1 / Sep 8 organic pieces (self-worth, unappreciated, solving problems, proving
+     yourself, sin of greed, breathing wrong). Lines marked ~ are trimmed or cleaned and need his
+     sign-off: A4.2 sub, A4.4 head, A4.8 head, C10 head, C16 both. Type boards reuse the temple-ink plate. */
+  { id: 'A4.1', name: 'Your value doesn’t disappear', layout: 'cover', bg: 'rtsA41', kicker: 'Return to Self',
+    head: 'Your value doesn’t disappear when you don’t work, perform or try.',
+    sub: 'Self-worth is an ongoing feeling that you’re enough.',
+    cta: 'See how the 12 weeks work' },
+  { id: 'A4.2', name: 'Self-worth is a feeling', layout: 'cover', bg: 'rtsA42', kicker: 'Return to Self',
+    head: 'Self-worth, at the end of the day, is a feeling.',
+    sub: 'No amount of numbers or external things outside of yourself will give you that feeling.',
+    cta: 'See how the 12 weeks work' },
+  { id: 'A4.3', name: 'Unappreciated', layout: 'cover', bg: 'rtsA43', kicker: 'Return to Self',
+    head: 'Do you feel unappreciated even though you try so hard?',
+    sub: 'It’s not about them. Subconsciously, you may still be tying your self-worth to your achievements.',
+    cta: 'See how the 12 weeks work' },
+  { id: 'A4.4', name: 'Outwork all your problems', layout: 'cover', bg: 'rtsA44', kicker: 'Return to Self',
+    head: 'My narrative was: outwork all your problems.',
+    sub: 'And what did that lead to? Breakdown. Burnout. Nothing ever felt enough.',
+    cta: 'See how the 12 weeks work' },
+  { id: 'A4.5', name: 'Urge to prove something', layout: 'cover', bg: 'rtsA45', kicker: 'Return to Self',
+    head: 'Do you feel a strong urge to prove something?',
+    sub: 'I was just trying to protect my ego and get a sense of worth.',
+    cta: 'See how the 12 weeks work' },
+  { id: 'A4.6', name: 'You deserve to feel self-worth', layout: 'cover', bg: 'rtsA46', kicker: 'Return to Self',
+    head: 'You deserve to feel self-worth.',
+    sub: 'Measurement is helpful, but it shouldn’t dictate your whole life and how you feel day to day.',
+    cta: 'See how the 12 weeks work' },
+  { id: 'A4.7', name: 'I see you', layout: 'type', bg: 'rtsC7', kicker: 'Return to Self',
+    head: 'I see you. You’re doing enough.',
+    sub: 'Keep going. It’s up to you to tell yourself that each moment, each day.',
+    cta: 'See how the 12 weeks work' },
+  { id: 'A4.8', name: 'Nothing felt enough', layout: 'cover', bg: 'rtsA48', kicker: 'Return to Self',
+    head: 'No amount of work, 10, 12 hour days, 7 days a week, felt enough.',
+    sub: 'Now more than ever it’s important we feel like we’re enough.',
+    cta: 'See how the 12 weeks work' },
+  { id: 'C9', name: 'So convenient to measure', layout: 'cover', bg: 'rtsC9', kicker: '',
+    head: 'It’s so convenient to measure all the time.',
+    sub: 'Measure your self-worth and attribute it to things like income, net worth, rankings, KPIs, performance.', cta: '' },
+  { id: 'C10', name: 'Worthy of love', layout: 'cover', bg: 'rtsC10', kicker: '',
+    head: 'I learned that the problems I solved, and how quickly I solved them, linked to self-worth. That I am worthy of love.',
+    sub: 'Three divorced parents, and a Japanese traditional father who was 54 years older than me.', cta: '' },
+  { id: 'C11', name: 'The sin of greed', layout: 'archival', bg: 'rtsC11', kicker: '',
+    head: 'The sin of greed: an excessive desire to want more than what one needs.',
+    sub: 'I used to wake up stressed, thinking about what I need to do for the rest of the day.', cta: '' },
+  { id: 'C12', name: 'Why rush again', layout: 'cover', bg: 'rtsC12', kicker: '',
+    head: 'You’re happy now. You’re at peace. Why do you need to start rushing again?',
+    sub: 'That’s made a huge change to the tension that I live by.', cta: '' },
+  { id: 'C13', name: 'Breathing wrong', layout: 'cover', bg: 'rtsC13', kicker: '',
+    head: 'You breathe every day but you’re still getting it wrong.',
+    sub: 'Exhalation is powerful. Breathe out, and focus on the exhalation more.', cta: '' },
+  { id: 'C14', name: 'Slowing down time', layout: 'cover', bg: 'rtsC14', kicker: '',
+    head: 'Long, slow, controlled exhalation that almost feels like you’re slowing down time.',
+    sub: 'I already feel my heart rate slowing.', cta: '' },
+  { id: 'C15', name: 'Glamour up my achievements', layout: 'cover', bg: 'rtsC15', kicker: '',
+    head: 'There were even points where I would glamour up my achievements to earn his love.',
+    sub: 'Can you remember when you had those moments? That overwhelming urge to prove yourself.', cta: '' },
+  { id: 'C16', name: 'People-pleaser to self-led', layout: 'type', bg: 'rtsC7', kicker: '',
+    head: 'From people-pleaser to self-led.',
+    sub: 'I help burnt out men feel seen and rebuild self-worth.', cta: '' },
+  { id: 'C17', name: 'What you can control', layout: 'cover', bg: 'rtsC17', kicker: '',
+    head: 'You can control how much work and effort you put in, but you can’t control other people’s perspectives.',
+    sub: 'The key is to not tie your self-worth to things that you have very little control over.', cta: '' },
+  { id: 'C18', name: 'A fine balance', layout: 'cover', bg: 'rtsC18', kicker: '',
+    head: 'It’s a fine balance between aiming, but not relentlessly chasing, burning you out.',
+    sub: 'It’s knowing that there is nothing wrong with you.', cta: '' },
+
+  /* ---- Static set v1 — 16 Sep 2026 (A1–A3, C1–C8) */
   { id: 'A1.1', name: 'Work ethic, peace', layout: 'graphic', bg: 'rtsA11', kicker: 'Return to Self',
     head: 'Is your relentless work ethic ever going to bring you peace?',
     sub: 'You’re not broken. You’re running on a pattern you built as a kid, because it kept you safe back then.',
