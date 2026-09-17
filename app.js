@@ -74,6 +74,23 @@ const BUILTIN = {
   rtsC6: { id: 'rtsC6', kind: 'photo', name: 'Static C6, dojo', url: 'assets/statics/rts-c6.jpg', builtin: true, rts: true },
   rtsC7: { id: 'rtsC7', kind: 'photo', name: 'Static C7, temple ink', url: 'assets/statics/rts-c7.jpg', builtin: true, rts: true },
   rtsC8: { id: 'rtsC8', kind: 'photo', name: 'Static C8, glass room', url: 'assets/statics/rts-c8.jpg', builtin: true, rts: true },
+  // static set v2 — the 26 Aug production-day stills (shoji room, the match), scrim baked in
+  rtsA41: { id: 'rtsA41', kind: 'photo', name: 'Static A4.1, shoji frontal', url: 'assets/statics/rts-a4-1.jpg', builtin: true, rts: true },
+  rtsA42: { id: 'rtsA42', kind: 'photo', name: 'Static A4.2, match and smoke', url: 'assets/statics/rts-a4-2.jpg', builtin: true, rts: true },
+  rtsA43: { id: 'rtsA43', kind: 'photo', name: 'Static A4.3, looking down', url: 'assets/statics/rts-a4-3.jpg', builtin: true, rts: true },
+  rtsA44: { id: 'rtsA44', kind: 'photo', name: 'Static A4.4, flame at the eye', url: 'assets/statics/rts-a4-4.jpg', builtin: true, rts: true },
+  rtsA45: { id: 'rtsA45', kind: 'photo', name: 'Static A4.5, match held up', url: 'assets/statics/rts-a4-5.jpg', builtin: true, rts: true },
+  rtsA46: { id: 'rtsA46', kind: 'photo', name: 'Static A4.6, shoji frontal warm', url: 'assets/statics/rts-a4-6.jpg', builtin: true, rts: true },
+  rtsA48: { id: 'rtsA48', kind: 'photo', name: 'Static A4.8, the chair wide', url: 'assets/statics/rts-a4-8.jpg', builtin: true, rts: true },
+  rtsC9: { id: 'rtsC9', kind: 'photo', name: 'Static C9, small flame', url: 'assets/statics/rts-c9.jpg', builtin: true, rts: true },
+  rtsC10: { id: 'rtsC10', kind: 'photo', name: 'Static C10, shoji frontal', url: 'assets/statics/rts-c10.jpg', builtin: true, rts: true },
+  rtsC11: { id: 'rtsC11', kind: 'photo', name: 'Static C11, match struck, black and white', url: 'assets/statics/rts-c11.jpg', builtin: true, rts: true },
+  rtsC12: { id: 'rtsC12', kind: 'photo', name: 'Static C12, shoji frontal', url: 'assets/statics/rts-c12.jpg', builtin: true, rts: true },
+  rtsC13: { id: 'rtsC13', kind: 'photo', name: 'Static C13, flame at the mouth', url: 'assets/statics/rts-c13.jpg', builtin: true, rts: true },
+  rtsC14: { id: 'rtsC14', kind: 'photo', name: 'Static C14, match, contemplative', url: 'assets/statics/rts-c14.jpg', builtin: true, rts: true },
+  rtsC15: { id: 'rtsC15', kind: 'photo', name: 'Static C15, flame at the eye', url: 'assets/statics/rts-c15.jpg', builtin: true, rts: true },
+  rtsC17: { id: 'rtsC17', kind: 'photo', name: 'Static C17, shoji frontal', url: 'assets/statics/rts-c17.jpg', builtin: true, rts: true },
+  rtsC18: { id: 'rtsC18', kind: 'photo', name: 'Static C18, the chair', url: 'assets/statics/rts-c18.jpg', builtin: true, rts: true },
   // Harrison's marks, for the signature strip
   rtsMark: { id: 'rtsMark', kind: 'logo', name: 'Harrison ensō mark, white', url: 'assets/brand/mark-s-white.png', builtin: true },
   rtsShinbukan: { id: 'rtsShinbukan', kind: 'logo', name: 'Shinbukan crest', url: 'assets/brand/mark-shinbukan.png', builtin: true },
@@ -1612,14 +1629,15 @@ async function seedDemoSet() {
 
 
 /* ---------------- Return to Self static set ----------------
-   The 18 statics cut from Nathan's 16 Sep videos, one per video, rebuilt here
-   as ordinary editable covers so the copy, plates and marks are material to
-   remix. Same look as the reel covers — white Fraunces caps, an italic sub-line,
+   Two sets, 36 covers: v1, the 18 statics cut from Nathan's 16 Sep videos, one
+   per video; and v2 (17 Sep), 18 boards on the self-worth pillar built on the
+   26 Aug production-day stills. Both rebuilt here as ordinary editable covers
+   so the copy, plates and marks are material to remix. Same look as the reel covers — white Fraunces caps, an italic sub-line,
    one vermilion rule — with a signature strip: ensō mark, name, role, and the
    Shinbukan and Seizanji crests. Copy lives in statics.js; plates in
    assets/statics; marks in assets/brand. The block is anchored above the
    3:4 grid crop so the headline survives the profile view. */
-const STATIC_SET = 'rts-statics-v1';
+const STATIC_SET = 'rts-statics-v2';
 const RTS = { ink: '#14120e', red: '#b5432f', white: '#fbf7ef', font: 'Fraunces' };
 function staticHeadSize(t) { const n = t.length; return n <= 32 ? 92 : n <= 62 ? 64 : n <= 92 ? 54 : 47; }
 function staticLayers(s) {

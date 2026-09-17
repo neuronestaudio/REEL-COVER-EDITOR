@@ -119,7 +119,7 @@ app.js       renderer, editor, storage, export
 assets/      shipped photo, studio-grade cutout, mosaic source
 assets/stills/  day-1 REEL COVER stills (the default batch photo set)
 captions.js  the 72 cover captions, with hand-set line breaks
-statics.js   the 18 static-set boards (copy, plate, layout)
+statics.js   the static-set boards (copy, plate, layout): v1, 18 from Nathan's videos; v2, 18 on self-worth from the 26 Aug stills
 assets/statics/  static-set plates · assets/brand/  Harrison's marks
 mp/          MediaPipe Selfie Segmentation runtime and models (~12 MB)
 vendor/      JSZip (ZIP export)
