@@ -1,10 +1,52 @@
-/* Return to Self static sets: v1 (16 Sep 2026, A1–A3 / C1–C8) and v2 (17 Sep 2026, A4 / C9–C18, below).
+/* Return to Self static sets: v3 (17 Sep 2026, A5, "if this is you"), v2 (17 Sep 2026, A4 / C9–C18) and v1 (16 Sep 2026, A1–A3 / C1–C8), newest first.
    v1 — 16 Sep 2026.
    One board per video from Nathan's shoot: three ad concepts (hook-matched
    variants) and eight content pieces. Copy is verbatim from the transcripts
    except A1.4's sub and C6's headline, which are paraphrases awaiting sign-off.
    `bg` names a built-in still in assets/statics (photo top, ink below). */
 window.__RTS_STATICS__ = [
+  /* ---- Static set v3 — if this is you, 17 Sep 2026.
+     Nine boards on the empty shoji room from the hero film (rts-hero-v4.mp4 at 10.72 s). Copy is the
+     landing page's "Who this is for" section word for word: the headline, the lede and the six lines
+     that name the pattern; A5.9's sub is Harrison's 12-weeks line from Ad 1. The six pattern boards
+     carry the kicker "If this is you". Sub-lines marked ~ in the diagnostic are the lede adapted. */
+  { id: 'A5.1', name: 'Looks right, not yours', layout: 'archival', bg: 'rtsRoom', kicker: 'Return to Self',
+    head: 'You built the life that looks right. It does not feel like yours.',
+    sub: 'If more than one of these lands, you are in the right place. They tend to travel together.',
+    cta: 'See how the 12 weeks work' },
+  { id: 'A5.2', name: 'Solid, fraud', layout: 'cover', bg: 'rtsRoom', kicker: 'If this is you',
+    head: 'They call you solid, you feel like a fraud.',
+    sub: 'If this is you, you are in the right place.',
+    cta: 'See how the 12 weeks work' },
+  { id: 'A5.3', name: 'Yes when you mean no', layout: 'cover', bg: 'rtsRoom', kicker: 'If this is you',
+    head: 'You say yes when you mean no, then call it keeping the peace.',
+    sub: 'If this is you, you are in the right place.',
+    cta: 'See how the 12 weeks work' },
+  { id: 'A5.4', name: 'Approval you never feel', layout: 'cover', bg: 'rtsRoom', kicker: 'If this is you',
+    head: 'You chase an approval you never actually feel.',
+    sub: 'If this is you, you are in the right place.',
+    cta: 'See how the 12 weeks work' },
+  { id: 'A5.5', name: 'Anger you cannot name', layout: 'cover', bg: 'rtsRoom', kicker: 'If this is you',
+    head: 'There is an anger underneath you cannot name.',
+    sub: 'If this is you, you are in the right place.',
+    cta: 'See how the 12 weeks work' },
+  { id: 'A5.6', name: 'Standard someone else set', layout: 'cover', bg: 'rtsRoom', kicker: 'If this is you',
+    head: 'You still meet a standard someone else set.',
+    sub: 'If this is you, you are in the right place.',
+    cta: 'See how the 12 weeks work' },
+  { id: 'A5.7', name: 'Close, arm’s length', layout: 'cover', bg: 'rtsRoom', kicker: 'If this is you',
+    head: 'You want to be close, and keep everyone at arm’s length.',
+    sub: 'If this is you, you are in the right place.',
+    cta: 'See how the 12 weeks work' },
+  { id: 'A5.8', name: 'They travel together', layout: 'cover', bg: 'rtsRoom', kicker: 'Return to Self',
+    head: 'They tend to travel together.',
+    sub: 'They call you solid, you feel like a fraud. You say yes when you mean no. You chase an approval you never feel. There is an anger you cannot name. You still meet a standard someone else set. You want to be close, and keep everyone at arm’s length.',
+    cta: 'See how the 12 weeks work' },
+  { id: 'A5.9', name: 'In the right place', layout: 'archival', bg: 'rtsRoom', kicker: 'Return to Self',
+    head: 'If more than one of these lands, you are in the right place.',
+    sub: 'Return to Self is 12 weeks of learning what patterns run you, and truly practising what it’s like to respond from the real you.',
+    cta: 'See how the 12 weeks work' },
+
   /* ---- Static set v2 — self-worth, 17 Sep 2026.
      Eighteen boards on the 26 Aug production-day stills (shoji room, the match), copy verbatim from
      Harrison's Sep 1 / Sep 8 organic pieces (self-worth, unappreciated, solving problems, proving

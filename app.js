@@ -91,6 +91,8 @@ const BUILTIN = {
   rtsC15: { id: 'rtsC15', kind: 'photo', name: 'Static C15, flame at the eye', url: 'assets/statics/rts-c15.jpg', builtin: true, rts: true },
   rtsC17: { id: 'rtsC17', kind: 'photo', name: 'Static C17, shoji frontal', url: 'assets/statics/rts-c17.jpg', builtin: true, rts: true },
   rtsC18: { id: 'rtsC18', kind: 'photo', name: 'Static C18, the chair', url: 'assets/statics/rts-c18.jpg', builtin: true, rts: true },
+  // static set v3 — the empty shoji room from the hero film (10.72 s), 4x upscale, scrim baked in
+  rtsRoom: { id: 'rtsRoom', kind: 'photo', name: 'Static A5, the room', url: 'assets/statics/rts-room.jpg', builtin: true, rts: true },
   // Harrison's marks, for the signature strip
   rtsMark: { id: 'rtsMark', kind: 'logo', name: 'Harrison ensō mark, white', url: 'assets/brand/mark-s-white.png', builtin: true },
   rtsShinbukan: { id: 'rtsShinbukan', kind: 'logo', name: 'Shinbukan crest', url: 'assets/brand/mark-shinbukan.png', builtin: true },
@@ -1629,15 +1631,17 @@ async function seedDemoSet() {
 
 
 /* ---------------- Return to Self static set ----------------
-   Two sets, 36 covers: v1, the 18 statics cut from Nathan's 16 Sep videos, one
-   per video; and v2 (17 Sep), 18 boards on the self-worth pillar built on the
-   26 Aug production-day stills. Both rebuilt here as ordinary editable covers
-   so the copy, plates and marks are material to remix. Same look as the reel covers — white Fraunces caps, an italic sub-line,
+   Three sets, 45 covers, newest first: v3 (17 Sep), nine boards on the
+   landing page's "if this is you" lines over the empty shoji room; v2 (17 Sep),
+   18 boards on the self-worth pillar built on the 26 Aug production-day stills;
+   v1, the 18 statics cut from Nathan's 16 Sep videos, one per video. All
+   rebuilt here as ordinary editable covers so the copy, plates and marks are
+   material to remix. Same look as the reel covers — white Fraunces caps, an italic sub-line,
    one vermilion rule — with a signature strip: ensō mark, name, role, and the
    Shinbukan and Seizanji crests. Copy lives in statics.js; plates in
    assets/statics; marks in assets/brand. The block is anchored above the
    3:4 grid crop so the headline survives the profile view. */
-const STATIC_SET = 'rts-statics-v2';
+const STATIC_SET = 'rts-statics-v3';
 const RTS = { ink: '#14120e', red: '#b5432f', white: '#fbf7ef', font: 'Fraunces' };
 function staticHeadSize(t) { const n = t.length; return n <= 32 ? 92 : n <= 62 ? 64 : n <= 92 ? 54 : 47; }
 function staticLayers(s) {
