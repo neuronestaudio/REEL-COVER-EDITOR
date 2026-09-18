@@ -449,6 +449,14 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
       <div class="row"><label>Colour</label><div class="ctl"><input type="color" id="ovColor"><input type="range" id="ovOpacity" min="0" max="1" step="0.01"><span class="val" id="ovOpacityV"></span></div></div>
     </div>
 
+    <div class="sec" id="secBlocks">
+      <h3>Blocks <span class="acts">
+        <button class="small" id="saveBlock" title="Save this cover's layers as a block — or just the selected layer — to paste onto any other cover">Save as block</button>
+      </span></h3>
+      <div class="chips" id="blockList"></div>
+      <div class="empty" style="font-style:normal">Click a block to paste it onto this cover. Every piece lands as an ordinary layer you can move or edit.</div>
+    </div>
+
     <div class="sec" id="secLayers">
       <h3>Layers <span class="acts">
         <button class="small" id="addText">+ Text</button>

@@ -74,6 +74,13 @@ placed at the top of the profile grid. Copy is in `statics.js`, the plates in `a
 The **Return to Self static** template starts a new cover in the same look. Bump `STATIC_SET`
 in `app.js` to push a changed set.
 
+**Blocks** — ready-made groups of layers pasted onto whichever cover is open: the signature
+strip (ensō mark, name, role line, both dojo crests) at the foot or inside the 3:4 grid crop,
+the ensō mark, the dojo crests, the reel caption look, the static headline look and a CTA
+button. **Save as block** keeps the open cover's layers — or only the selected layer — as a
+block of your own, so a lock-up built once on any cover can be pasted onto every other one.
+Own blocks live in that browser's settings; every paste is ordinary layers and one undo step.
+
 **Reel to-do set** — the working queue for re-covering the live reels. Open the link ending
 `#todo` once and that browser is given one cover for each reel whose cover can still be
 swapped after publishing (`reels.js`, from the updater's manifest: 55 reels plus #51, which

@@ -1029,6 +1029,7 @@ function focusPropPanel() {
   if (!active) { poppedFor = null; return; }
   active.style.order = '0';
   $('#secLayers').style.order = '1';
+  $('#secBlocks').style.order = '2'; // blocks stay in reach, so several can be pasted in a row
   if (poppedFor !== sel) {
     poppedFor = sel;
     insp.scrollTop = 0;
@@ -2011,14 +2012,20 @@ function staticLayers(s) {
     layers.push(newRule({ x: left ? ax + bw / 2 / W : 0.5, y: yc / H, width: bw / W, thick: btnH, color: RTS.red, alpha: 1 }));
     cta.y = (yc - cta.size * cta.line / 2) / H; layers.push(cta);
   }
-  // signature strip
-  const sy = 0.925;
-  layers.push(newLogo({ image: 'rtsMark', x: 0.098, y: sy, size: 0.059, alpha: 0.92 }));
-  layers.push(mk({ text: 'Harrison Saito', weight: 500, size: 28, track: 0, line: 1.05, width: 0.5, align: 'left', x: 0.145, y: (sy * H - 31) / H, shadow: 0.25 }));
-  layers.push(mk({ text: 'Educator. Martial Artist. Coach.', weight: 500, size: 14, track: 0.18, line: 1.2, width: 0.6, upper: true, align: 'left', x: 0.145, y: (sy * H + 5) / H, color: '#cfc7b8', shadow: 0 }));
-  layers.push(newLogo({ image: 'rtsShinbukan', x: 0.815, y: sy, size: 0.043, alpha: 0.9 }));
-  layers.push(newLogo({ image: 'rtsSeizanji', x: 0.895, y: sy, size: 0.078, alpha: 0.9 }));
+  layers.push(...signatureLayers(0.925));
   return layers;
+}
+/* The signature strip on its own, centred on height `sy` (0..1): ensō mark, name,
+   role line, Shinbukan and Seizanji crests. Shared by the statics and the Blocks panel. */
+function signatureLayers(sy) {
+  const mk = o => newText(Object.assign({ font: RTS.font, align: 'left', x: 0.145, color: RTS.white, box: 'none', outline: 0, shadow: 0.45, behind: false }, o));
+  return [
+    newLogo({ image: 'rtsMark', x: 0.098, y: sy, size: 0.059, alpha: 0.92 }),
+    mk({ text: 'Harrison Saito', weight: 500, size: 28, track: 0, line: 1.05, width: 0.5, y: (sy * H - 31) / H, shadow: 0.25 }),
+    mk({ text: 'Educator. Martial Artist. Coach.', weight: 500, size: 14, track: 0.18, line: 1.2, width: 0.6, upper: true, y: (sy * H + 5) / H, color: '#cfc7b8', shadow: 0 }),
+    newLogo({ image: 'rtsShinbukan', x: 0.815, y: sy, size: 0.043, alpha: 0.9 }),
+    newLogo({ image: 'rtsSeizanji', x: 0.895, y: sy, size: 0.078, alpha: 0.9 }),
+  ];
 }
 function buildStaticDoc(s) {
   const d = baseDoc(`${s.id} \u00b7 ${s.name}`);
@@ -2064,6 +2071,67 @@ async function seedStaticSet() {
   settings.staticSet = STATIC_SET;
   await store.saveSettings(settings).catch(() => {});
   return true;
+}
+
+/* ---------------- blocks ----------------
+   Ready-made groups of layers — the signature strip, the marks, the two caption
+   looks, a CTA button — pasted onto whichever cover is open, so a logo lock-up never
+   has to be rebuilt by hand. "Save as block" keeps the open cover's layers (or just
+   the selected one) as a block of your own; those live in this browser's settings.
+   Everything lands as ordinary layers with fresh ids, in one undo step. */
+function ctaLayers(text, yc) {
+  const cta = newText({ font: RTS.font, align: 'center', x: 0.5, color: RTS.white, box: 'none', outline: 0, shadow: 0, behind: false, text, weight: 600, size: 17, track: 0.2, line: 1.2, width: 0.86, upper: true });
+  const c = measureCtx(); c.font = fontString(cta); c.letterSpacing = `${cta.track * cta.size}px`;
+  const bw = c.measureText(text.toUpperCase()).width + 64, btnH = 54;
+  cta.y = (yc * H - cta.size * cta.line / 2) / H;
+  return [newRule({ x: 0.5, y: yc, width: bw / W, thick: btnH, color: RTS.red, alpha: 1 }), cta];
+}
+const BLOCKS = [
+  { id: 'sig-foot', name: 'Signature strip', make: () => signatureLayers(0.925) },
+  { id: 'sig-crop', name: 'Signature · inside grid crop', make: () => signatureLayers(0.842) },
+  { id: 'mark', name: 'Ensō mark', make: () => [newLogo({ image: 'rtsMark', x: 0.5, y: 0.17, size: 0.085, alpha: 0.95 })] },
+  { id: 'crests', name: 'Dojo crests', make: () => [newLogo({ image: 'rtsShinbukan', x: 0.455, y: 0.17, size: 0.05, alpha: 0.92 }), newLogo({ image: 'rtsSeizanji', x: 0.55, y: 0.17, size: 0.09, alpha: 0.92 })] },
+  { id: 'cap-reel', name: 'Reel caption', make: () => coverLayers({ kicker: 'KICKER LINE', main: 'Your headline\ngoes here', sub: 'and the italic sub-line' }, batchOpts) },
+  { id: 'cap-static', name: 'Static headline', make: () => staticLayers({ layout: 'cover', kicker: 'RETURN TO SELF', head: 'Your headline goes here', sub: 'The italic sub-line sits under the rule.' }).slice(0, -5) },
+  { id: 'cta', name: 'CTA button', make: () => ctaLayers('Book a call', 0.8) },
+];
+async function pasteBlock(name, layers) {
+  if (!layers.length) return;
+  pushUndo();
+  const fresh = layers.map(l => ({ ...JSON.parse(JSON.stringify(l)), id: uid() }));
+  doc.layers.push(...fresh);
+  await preloadAssets(fresh.map(l => l.image));
+  select(fresh[fresh.length - 1].id); commit(); syncAll();
+  toast(`${name} added — ${fresh.length} layer${fresh.length > 1 ? 's' : ''}`);
+}
+function renderBlocks() {
+  const c = $('#blockList'); if (!c) return; c.innerHTML = '';
+  BLOCKS.forEach(b => {
+    const el = document.createElement('button'); el.className = 'chip'; el.textContent = b.name; el.title = 'Paste onto this cover';
+    el.onclick = async () => { await loadCoverFonts(); await document.fonts.load(`500 100px "${RTS.font}"`).catch(() => {}); pasteBlock(b.name, b.make()); };
+    c.appendChild(el);
+  });
+  (settings.blocks || []).forEach(b => {
+    const el = document.createElement('button'); el.className = 'chip'; el.title = `Your block · ${b.layers.length} layer${b.layers.length > 1 ? 's' : ''} · paste onto this cover`;
+    el.style.borderColor = 'var(--accent)'; el.style.color = 'var(--text, inherit)';
+    el.append(b.name + ' ');
+    const x = document.createElement('span'); x.textContent = '✕'; x.title = 'Delete this block'; x.style.opacity = '.6';
+    x.onclick = e => { e.stopPropagation(); if (!confirm(`Delete the block “${b.name}”?`)) return; settings.blocks = settings.blocks.filter(o => o.id !== b.id); saveSettingsSoon(); renderBlocks(); };
+    el.appendChild(x);
+    el.onclick = () => pasteBlock(b.name, b.layers);
+    c.appendChild(el);
+  });
+}
+function bindBlocks() {
+  $('#saveBlock').onclick = () => {
+    const one = doc.layers.find(l => l.id === sel), layers = one ? [one] : doc.layers;
+    if (!layers.length) return toast('This cover has no layers to save');
+    const name = (prompt(one ? 'Save the selected layer as a block. Name it:' : `Save all ${layers.length} layers of this cover as a block. Name it:`, one ? 'My layer' : doc.name.replace(/^\d+ · (TODO · )?/, '').slice(0, 28)) || '').trim();
+    if (!name) return;
+    settings.blocks = [...(settings.blocks || []), { id: uid(), name, layers: JSON.parse(JSON.stringify(layers)) }];
+    saveSettingsSoon(); renderBlocks(); toast(`Saved “${name}” — it is in Blocks on every cover`);
+  };
+  renderBlocks();
 }
 
 /* ---------------- reel to-do set ----------------
@@ -2131,7 +2199,7 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
     settings.profileEdited = true;
   } catch {}
   try { covers = await store.listCovers(); } catch (e) { console.warn(e); covers = []; }
-  refreshAssetSelects(); renderTemplates(); bindBatch(); bindMosaic(); bindSpan();
+  refreshAssetSelects(); renderTemplates(); bindBatch(); bindMosaic(); bindSpan(); bindBlocks();
   batchOpts.pool = assetsOf('photo').filter(p => p.still).map(p => p.id);
   let seeded = false;
   if (settings.demoSet !== DEMO_SET) { try { seeded = await seedDemoSet(); } catch (e) { console.warn('demo set', e); } }
