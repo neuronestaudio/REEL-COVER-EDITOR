@@ -43,6 +43,8 @@ const BUILTIN = {
   cutout: { id: 'cutout', kind: 'cutout', name: 'Tatami studio (cutout)', url: 'assets/cutout.png', builtin: true },
   mosaic: { id: 'mosaic', kind: 'photo', name: 'Candlelight (mosaic)', url: 'assets/mosaic.jpg', builtin: true },
   mosaicMatch: { id: 'mosaicMatch', kind: 'photo', name: 'Match, slowing down time (mosaic)', url: 'assets/mosaic-match.jpg', builtin: true },
+  // stand-in plate for the reel to-do set; versioned name because /assets is cached immutable
+  reelDummy: { id: 'reelDummy', kind: 'photo', name: 'Placeholder, swap photo', url: 'assets/placeholder-swap-photo-v1.jpg', builtin: true },
   // Day-1 REEL COVER stills — the default photo set for the batch
   still01: { id: 'still01', kind: 'photo', name: 'Seated, looking away', url: 'assets/stills/still-01.jpg', builtin: true, still: true },
   still02: { id: 'still02', kind: 'photo', name: 'Behind camera, softbox', url: 'assets/stills/still-02.jpg', builtin: true, still: true },
@@ -825,14 +827,28 @@ async function coversFromFiles(files, at) {
 }
 /* Mark an element as a place photos can be dropped to become covers. getAt()
    says where in the grid order the first one lands. */
-function wireCoverDrop(el, getAt) {
+function wireCoverDrop(el, getAt, getRec) {
   el.addEventListener('dragover', e => { if (!dtHasFiles(e)) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; el.classList.add('filedrop'); });
   el.addEventListener('dragleave', () => el.classList.remove('filedrop'));
   el.addEventListener('drop', e => {
     if (!dtHasFiles(e)) return;
     e.preventDefault(); e.stopPropagation(); el.classList.remove('filedrop');
-    coversFromFiles(e.dataTransfer.files, getAt());
+    const rec = getRec && getRec();
+    if (rec?.doc?.reel) photoIntoCover(rec, e.dataTransfer.files); else coversFromFiles(e.dataTransfer.files, getAt());
   });
+}
+/* A photo dropped on a reel to-do tile becomes that cover's photo — the text and
+   the grid slot stay put, so the queue can be worked straight from the grid. */
+async function photoIntoCover(rec, files) {
+  const f = [...files].find(x => x.type.startsWith('image/')); if (!f) return toast('That isn’t an image file');
+  setStatus('adding photo…');
+  const a = await store.putAsset(f, 'bg', f.name.replace(/\.[^.]+$/, '').slice(0, 40));
+  await new Promise(r => { const im = new Image(); im.onload = im.onerror = r; im.src = a.url; imgCache[a.id] = im; });
+  const set = d => { d.bg = { ...d.bg, type: 'image', image: a.id, fit: 'fill', scale: 1, x: 0, y: 0 }; };
+  if (rec.id === doc?.id) { pushUndo(); set(doc); commit(); syncAll(); }
+  else { set(rec.doc); try { await store.saveCover(rec); } catch (e) { console.warn(e); } }
+  renderBgPick(); renderGrid(); renderCoverList(); setStatus('saved · this browser', 'ok');
+  toast(`Photo set on ${rec.name.split(' · ')[0]} — double-click to reposition`);
 }
 // Drops in the gaps between tiles land at the end of the grid.
 wireCoverDrop($('#igrid'), () => null);
@@ -1159,7 +1175,7 @@ function renderGrid() {
       t.addEventListener('dragstart', e => { gridDrag = r.id; e.dataTransfer.effectAllowed = 'move'; }); t.addEventListener('dragover', e => { if (dtHasFiles(e)) return; e.preventDefault(); t.classList.add('drop'); }); t.addEventListener('dragleave', () => t.classList.remove('drop'));
       t.addEventListener('drop', e => { if (dtHasFiles(e)) return; e.preventDefault(); t.classList.remove('drop'); reorderGrid(gridDrag, r.id); });
       t.addEventListener('dblclick', () => { loadDoc(d); switchView('editor'); });
-      wireCoverDrop(t, () => i);                       // a photo dropped here lands in this slot
+      wireCoverDrop(t, () => i, () => r);              // a photo dropped here lands in this slot, or in the to-do cover already there
     } else {
       t.classList.add('ph'); t.textContent = i === order.length ? 'drop a photo' : '';
       t.addEventListener('click', () => { if (spanPick) setSpanAt(i); });
@@ -1670,9 +1686,9 @@ async function generateBatch() {
   await preloadAssets(batchOpts.pool);
 
   if (batchOpts.replace) {
-    const old = covers.filter(c => c.doc?.batch);
+    const old = covers.filter(c => c.doc?.batch && !c.doc.reel); // the reel to-do set is hand-finished work, never regenerated
     for (const o of old) { await store.deleteCover(o.id).catch(() => {}); }
-    covers = covers.filter(c => !c.doc?.batch);
+    covers = covers.filter(c => !c.doc?.batch || c.doc.reel);
     settings.gridOrder = (settings.gridOrder || []).filter(id => covers.some(c => c.id === id));
   }
   batchOpts.seq = batchStills(batchOpts);
@@ -1695,18 +1711,25 @@ async function generateBatch() {
 }
 
 async function exportBatchZip() {
-  const set = covers.filter(c => c.doc?.batch).sort((a, b) => a.doc.batch.n - b.doc.batch.n);
-  if (!set.length) return toast('Generate the set first');
+  // one cover per post number: a reel to-do cover stands in for the generated one,
+  // and one still on the placeholder plate is left out so it can never be posted
+  const byN = new Map();
+  for (const r of covers.filter(c => c.doc?.batch)) { const cur = byN.get(r.doc.batch.n); if (!cur || (r.doc.reel && !cur.doc.reel)) byN.set(r.doc.batch.n, r); }
+  const live = r => r.id === doc?.id ? doc : r.doc;
+  const all = [...byN.values()].sort((a, b) => a.doc.batch.n - b.doc.batch.n);
+  const set = all.filter(r => !onPlaceholder(live(r))), held = all.length - set.length;
+  if (!set.length) return toast(all.length ? 'Every cover is still on the placeholder photo' : 'Generate the set first');
   const prog = $('#batchProg'), bar = $('i', prog); prog.classList.add('on');
   const zip = new JSZip();
   for (let i = 0; i < set.length; i++) {
-    const r = set[i]; const d = r.id === doc?.id ? doc : r.doc;
-    zip.file(`${String(d.batch.n).padStart(2, '0')}-${slug(d.name.replace(/^\d+ · /, ''))}.png`, await renderBlob(d, 1));
+    const d = live(set[i]);
+    zip.file(`${String(d.batch.n).padStart(2, '0')}-${slug(d.name.replace(/^\d+ · (TODO · )?/, ''))}.png`, await renderBlob(d, 1));
     bar.style.width = Math.round((i + 1) / set.length * 100) + '%'; $('#batchMsg').textContent = `rendering ${i + 1} of ${set.length}`;
   }
   const blob = await zip.generateAsync({ type: 'blob' });
   await store.download('harrison-reel-covers-72.zip', blob);
-  $('#batchMsg').textContent = 'exported'; prog.classList.remove('on'); bar.style.width = '0';
+  $('#batchMsg').textContent = held ? `exported ${set.length} · ${held} left out, still on the placeholder photo` : 'exported'; prog.classList.remove('on'); bar.style.width = '0';
+  if (held) toast(`${held} cover${held > 1 ? 's' : ''} left out — still on the placeholder photo`);
 }
 
 function bindBatch() {
@@ -1936,13 +1959,14 @@ async function seedDemoSet() {
   const tiles = mos.map((d, i) => { d.createdAt = d.updatedAt = oldest + i; return coverRecord(d); });
   // replace an earlier generated set rather than stacking a second copy; the
   // statics stay on top and mosaics cut from other photos stay at the foot
-  const gone = covers.filter(c => c.doc?.batch || mosaicSetOf(c.doc) === mosaicOpts.image), goneIds = new Set(gone.map(c => c.id));
+  const gone = covers.filter(c => (c.doc?.batch && !c.doc.reel) || mosaicSetOf(c.doc) === mosaicOpts.image), goneIds = new Set(gone.map(c => c.id));
   for (const c of gone) await store.deleteCover(c.id).catch(() => {});
   const statics = (settings.gridOrder || []).filter(id => covers.find(c => c.id === id)?.doc?.rts);
   const otherMos = covers.filter(c => c.doc?.mosaic && !goneIds.has(c.id));
   covers = covers.filter(c => !goneIds.has(c.id)).concat(batch, tiles);
   await store.saveCovers([...batch, ...tiles]);
   settings.gridOrder = [...statics, ...batchGridIds(batch), ...mosaicGridIds(tiles), ...mosaicGridIds(otherMos)];
+  slotReelCovers(covers.filter(c => c.doc?.reel)); // to-do covers go back into their post's slot
   settings.demoSet = DEMO_SET;
   await store.saveSettings(settings).catch(() => {});
   return true;
@@ -2042,6 +2066,49 @@ async function seedStaticSet() {
   return true;
 }
 
+/* ---------------- reel to-do set ----------------
+   The working queue for re-covering the live reels: one cover for each reel whose
+   cover can still be swapped (reels.js, from the updater's manifest), carrying its
+   cover text on a placeholder plate, so the only job left per cover is the photo.
+   Each takes the grid slot of the generated cover with the same post number — the
+   grid stays in posting order and the mosaic stays aligned, and the placeholder
+   tiles are the ones still to do. The generated covers are kept in the library.
+   Opt-in: only a browser that opens the link ending #todo is given the set, so the
+   client demo never shows placeholders. Re-seeding only adds post numbers that have
+   no to-do cover yet, so bumping REEL_SET can never wipe finished work. */
+const REEL_SET = 'reel-todo-1';
+const REEL_PLACEHOLDER = 'reelDummy';
+function onPlaceholder(d) { return !!d?.reel && d.bg?.image === REEL_PLACEHOLDER; }
+function reelDocName(c) { return batchDocName(c).replace(' · ', ' · TODO · '); }
+function slotReelCovers(recs) {
+  const order = settings.gridOrder || [], loose = [];
+  for (const r of recs) {
+    if (order.includes(r.id)) continue;
+    const twin = covers.find(c => c.doc?.batch && !c.doc.reel && c.doc.batch.n === r.doc.batch.n && order.includes(c.id));
+    if (twin) order[order.indexOf(twin.id)] = r.id; else loose.push(r);
+  }
+  settings.gridOrder = batchGridIds(loose).concat(order);
+}
+async function seedReelSet() {
+  const list = window.__REEL_TODO__ || []; if (!list.length) return false;
+  setStatus('loading the reel to-do set…');
+  await loadCoverFonts();
+  await preloadAssets([REEL_PLACEHOLDER]);
+  const text = new Map(COVER_TEXT.map(c => [c.n, c]));
+  const have = new Set(covers.filter(c => c.doc?.reel).map(c => c.doc.batch.n));
+  // newest in the library, so the studio opens on the latest reel still to do
+  const now = Math.max(Date.now(), ...covers.map(c => c.updatedAt || 0)) + 1000;
+  const recs = list.filter(r => text.has(r.n) && !have.has(r.n)).map((r, i) => {
+    const c = text.get(r.n), d = buildBatchDoc(c, REEL_PLACEHOLDER, batchOpts);
+    d.name = reelDocName(c); d.reel = { set: REEL_SET, code: r.code };
+    d.createdAt = d.updatedAt = now + i; return coverRecord(d);
+  });
+  if (recs.length) { await store.saveCovers(recs); covers = covers.concat(recs); slotReelCovers(recs); }
+  settings.reelSet = REEL_SET;
+  await store.saveSettings(settings).catch(() => {});
+  return recs.length > 0;
+}
+
 /* ---------------- views ---------------- */
 function switchView(v) {
   $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.view === v));
@@ -2070,6 +2137,8 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   if (settings.demoSet !== DEMO_SET) { try { seeded = await seedDemoSet(); } catch (e) { console.warn('demo set', e); } }
   if (settings.staticSet !== STATIC_SET) { try { await seedStaticSet(); } catch (e) { console.warn('static set', e); } }
   if (settings.mosaicSet !== MOSAIC_SET) { try { await seedMosaicSet(); } catch (e) { console.warn('mosaic set', e); } }
+  const todo = location.hash === '#todo';
+  if (todo && settings.reelSet !== REEL_SET) { try { await seedReelSet(); } catch (e) { console.warn('reel set', e); } }
   if (settings.demoView !== DEMO_VIEW) { settings.shape = '34'; settings.demoView = DEMO_VIEW; store.saveSettings(settings).catch(() => {}); }
   if (covers.length) loadDoc([...covers].sort((a, b) => b.updatedAt - a.updatedAt)[0].doc);
   else { // seed a first set from the templates so the studio opens with something to look at
@@ -2081,6 +2150,10 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   setStatus('saved in this browser', 'ok');
   getImg('photo'); getImg('cutout');
   // a first visit, or a link ending #grid, opens straight on the profile
-  if (seeded || location.hash === '#grid') switchView('grid');
+  if (seeded || todo || location.hash === '#grid') switchView('grid');
+  if (todo) { // the statics sit above the queue, so bring the first cover still to do into view
+    const next = (settings.gridOrder || []).find(id => onPlaceholder(covers.find(c => c.id === id)?.doc));
+    $$('#igrid .tile').find(t => t.dataset.id === next)?.scrollIntoView({ block: 'center' });
+  }
 })();
 })();

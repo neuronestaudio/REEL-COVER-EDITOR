@@ -74,6 +74,18 @@ placed at the top of the profile grid. Copy is in `statics.js`, the plates in `a
 The **Return to Self static** template starts a new cover in the same look. Bump `STATIC_SET`
 in `app.js` to push a changed set.
 
+**Reel to-do set** — the working queue for re-covering the live reels. Open the link ending
+`#todo` once and that browser is given one cover for each reel whose cover can still be
+swapped after publishing (`reels.js`, from the updater's manifest: 55 reels plus #51, which
+still needs copy). Each carries its cover text on a placeholder plate and takes the grid slot
+of the generated cover with the same post number, so the grid stays in posting order and the
+placeholder tiles are the ones left to do. **Drop a photo on a placeholder tile and it becomes
+that cover's photo in place**; double-click to reposition it. The generated covers stay in the
+library. The set is opt-in, so the client demo never shows placeholders, and re-seeding only
+adds post numbers that have no to-do cover yet — bumping `REEL_SET` cannot wipe finished work.
+**Export the set as a ZIP** takes the to-do cover for a post over the generated one and leaves
+out any cover still on the placeholder, so a placeholder can never reach the updater.
+
 **3×3 mosaic** — on the Profile grid tab: drop or upload a photo and it is cut across nine
 reels at the foot of the grid, with zoom, pan and a preview of the finished block. Instagram
 crops reels to 3:4 from the centre, so the mosaic is laid out across nine 1080×1440 crop
