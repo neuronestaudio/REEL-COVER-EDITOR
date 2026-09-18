@@ -100,6 +100,27 @@ aside.right{border-left:1px solid var(--line)}
 .bgpick .addtile small{display:block;font-size:8.5px;letter-spacing:.06em;margin-top:2px}
 .bgpick .x{position:absolute;right:2px;top:2px;display:none;width:15px;height:15px;padding:0;font-size:9px;line-height:1;border-radius:3px;background:rgba(0,0,0,.75);border-color:transparent}
 .bgpick button:hover .x{display:block}
+/* photo library — a single row until it is opened */
+.lib{border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,var(--raised),var(--panel));overflow:hidden}
+.lib[data-open=true]{border-color:var(--line-2)}
+.lib__bar{display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px 7px 7px;border:0;border-radius:0;background:none;text-align:left;cursor:pointer;color:var(--text)}
+.lib__bar:hover{background:rgba(255,255,255,.03)}
+.lib__thumb{flex:none;width:30px;aspect-ratio:9/16;border-radius:5px;overflow:hidden;background:#000;border:1px solid var(--line-2)}
+.lib__thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.lib__meta{flex:1;min-width:0;display:grid;gap:1px}
+.lib__meta b{font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lib__meta small{font-size:11px;color:var(--muted)}
+.lib__chev{flex:none;width:8px;height:8px;margin-right:4px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(45deg) translate(-2px,-2px);transition:transform .2s ease}
+.lib[data-open=true] .lib__chev{transform:rotate(-135deg) translate(-2px,-2px)}
+.lib__body{padding:2px 8px 8px;animation:libIn .18s ease}
+@keyframes libIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.lib__tools{display:flex;gap:6px;margin-bottom:7px}
+.lib__tools input{flex:1;min-width:0;padding:5px 9px;border-radius:99px;font-size:12px}
+.lib__groups{margin-bottom:7px}
+.lib__groups .chip i{font-style:normal;opacity:.6;margin-left:4px;font-size:10.5px}
+.lib__grid{max-height:min(46vh,340px);overflow-y:auto;padding-right:3px;scrollbar-width:thin;scrollbar-color:var(--line-2) transparent;overscroll-behavior:contain}
+.lib__grid .none{grid-column:1/-1;padding:18px 4px;text-align:center;color:var(--muted);font-size:12px}
+@media (prefers-reduced-motion:reduce){.lib__body{animation:none}.lib__chev{transition:none}}
 #dropZone{position:absolute;inset:0;display:none;place-items:center;background:rgba(22,21,15,.88);border:2px dashed var(--accent);z-index:5;pointer-events:none}
 #dropZone.on{display:grid}
 #dropZone b{font-family:var(--font-display);font-size:22px;color:var(--accent)}
@@ -390,7 +411,24 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
         <button class="chip" data-v="texture">Texture</button>
       </div>
       <div id="bgImageCtl">
-        <div class="bgpick" id="bgPick"></div>
+        <!-- Photo library: shut, it is one row showing the photo in use; open, a grouped,
+             searchable grid that scrolls inside itself, so the inspector never grows. -->
+        <div class="lib" id="bgLib" data-open="false">
+          <button class="lib__bar" id="bgLibBar" type="button" aria-expanded="false" aria-controls="bgLibBody">
+            <span class="lib__thumb" id="bgLibThumb"></span>
+            <span class="lib__meta"><b id="bgLibName">No photo</b><small id="bgLibCount"></small></span>
+            <span class="lib__chev" aria-hidden="true"></span>
+          </button>
+          <div class="lib__body" id="bgLibBody" hidden>
+            <div class="lib__tools">
+              <input type="search" id="bgLibQ" placeholder="Search the library…" aria-label="Search photos" autocomplete="off">
+              <button class="small" id="bgLibFolder" type="button" title="Add every image in a folder to the library. They stay in this browser — nothing is uploaded anywhere.">+ Folder</button>
+            </div>
+            <div class="chips lib__groups" id="bgLibGroups"></div>
+            <div class="bgpick lib__grid" id="bgPick"></div>
+          </div>
+        </div>
+        <input type="file" id="folderInput" webkitdirectory multiple hidden>
         <div class="row" style="margin-top:8px"><label>Fit</label><div class="ctl chips">
           <button class="chip" id="bgFill" title="Cover the whole frame">Fill frame</button>
           <button class="chip" id="bgFit" title="Show the whole image, letterboxed">Fit whole</button>

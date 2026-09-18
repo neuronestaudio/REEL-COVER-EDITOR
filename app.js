@@ -677,10 +677,42 @@ preview.addEventListener('wheel', e => {
 }, { passive: false });
 preview.addEventListener('pointerup', e => { if (drag?.moved) { undoStack.push(drag.before); redoStack = []; updateUndoBtns(); scheduleSave(); } drag = null; preview.classList.remove('grabbing'); });
 preview.addEventListener('dblclick', e => { const id = hitTest(canvasPoint(e)); if (id && id !== '__subject') { select(id); const l = doc.layers.find(x => x.id === id); if (l.type === 'text') { $('#tText').focus(); $('#tText').select(); } } });
+/* Copy and paste an element: Ctrl+C on the selected layer, Ctrl+V on this cover or any
+   other one (the clip outlives loadDoc, and localStorage carries it to another tab).
+   A paste into a cover that already has something at that spot steps down a little so
+   the copy is visible; into a clean cover it lands exactly where it came from.
+   Clicking the artwork also takes the caret out of the text box — before this, a click
+   on an element left focus in the box, so Ctrl+C copied the caption's text instead. */
+let layerClip = null;
+function copyLayer() {
+  const l = doc.layers.find(x => x.id === sel); if (!l) return false;
+  layerClip = JSON.parse(JSON.stringify(l));
+  try { localStorage.setItem('rcs.clip', JSON.stringify(layerClip)); } catch {}
+  toast(`Copied ${l.type === 'text' ? '“' + (l.text.split('\n')[0] || 'text').slice(0, 28) + '”' : l.type} — Ctrl+V pastes it on any cover`);
+  return true;
+}
+function pasteLayer() {
+  let c = layerClip;
+  if (!c) { try { c = JSON.parse(localStorage.getItem('rcs.clip') || 'null'); } catch {} }
+  if (!c || !c.type) return false;
+  const l = { ...JSON.parse(JSON.stringify(c)), id: uid() };
+  while (doc.layers.some(o => o.type === l.type && Math.abs(o.x - l.x) < 0.004 && Math.abs(o.y - l.y) < 0.004)) { l.y = Math.min(l.y + 0.03, 0.97); if (l.y >= 0.97) break; }
+  if (l.image && !assets[l.image]) { toast('That logo’s image is not in this browser’s library'); return true; }
+  addLayer(l); syncAll();
+  return true;
+}
+preview.addEventListener('pointerdown', () => { const a = document.activeElement; if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName)) a.blur(); }, true);
 window.addEventListener('keydown', e => {
   const tag = document.activeElement?.tagName; const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (typing) return; if (!$('#view-editor').classList.contains('active')) return;
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+    const k = e.key.toLowerCase();
+    if (k === 'c' && copyLayer()) { e.preventDefault(); return; }
+    if (k === 'x' && copyLayer()) { e.preventDefault(); deleteLayer(sel); return; }
+    if (k === 'v' && pasteLayer()) { e.preventDefault(); return; }
+    if (k === 'c' || k === 'x' || k === 'v') return; // nothing of ours to act on: leave the browser's own copy and paste alone
+  }
   if ((e.key === 'Delete' || e.key === 'Backspace') && sel && sel !== '__subject') { e.preventDefault(); deleteLayer(sel); }
   if (e.key.toLowerCase() === 'd' && sel && sel !== '__subject') { duplicateLayer(sel); }
   if (e.key.toLowerCase() === 'g') $('#btnGuides').click();
@@ -753,19 +785,80 @@ $('#bgFit').onclick = () => { pushUndo(); doc.bg.fit = 'fit'; doc.bg.scale = 1; 
 $('#bgReset').onclick = () => { pushUndo(); doc.bg.scale = 1; doc.bg.x = doc.bg.y = 0; doc.bg.blur = 0; doc.bg.bright = 1; doc.bg.sat = 1; commit(); syncAll(); };
 
 /* Background picker — every photo, upload and generated backdrop as a tile. */
+/* The photo library. Shut, it is one row naming the photo in use, so a library of a
+   hundred photos costs the inspector nothing; open, it is grouped, searchable and
+   scrolls inside its own window. Nothing is decoded while it is shut. Groups come from
+   what a photo is (shoot still, static plate) or, for an imported set named
+   "P01 - testimony - …", from the word in the middle. */
+const LIB = { open: false, group: 'All', q: '' };
+try { LIB.open = localStorage.getItem('rcs.libOpen') === '1'; LIB.group = localStorage.getItem('rcs.libGroup') || 'All'; } catch {}
+function libRemember() { try { localStorage.setItem('rcs.libOpen', LIB.open ? '1' : '0'); localStorage.setItem('rcs.libGroup', LIB.group); } catch {} }
+function photoGroup(a) {
+  if (a.still) return 'Shoot';
+  if (a.rts) return 'Statics';
+  if (a.builtin) return 'Studio';
+  const m = /^[A-Za-z]{1,3}\d+ - ([A-Za-z]+) - /.exec(a.name || '');
+  return m ? m[1][0].toUpperCase() + m[1].slice(1).toLowerCase() : 'Uploads';
+}
 function renderBgPick() {
   const c = $('#bgPick'); if (!c) return; c.innerHTML = '';
+  const all = [...assetsOf('photo'), ...assetsOf('bg')];
+  const cur = doc.bg.type === 'image' ? assets[doc.bg.image] : null;
+  const th = $('#bgLibThumb'); th.innerHTML = ''; if (cur) { const i = new Image(); i.src = cur.url; i.alt = ''; th.appendChild(i); }
+  $('#bgLibName').textContent = cur ? cur.name : 'No photo chosen';
+  $('#bgLibCount').textContent = `${all.length} photos · ${LIB.open ? 'close' : 'open'} the library`;
+  $('#bgLib').dataset.open = LIB.open; $('#bgLibBar').setAttribute('aria-expanded', LIB.open); $('#bgLibBody').hidden = !LIB.open;
+  if (!LIB.open) return;
+
+  const counts = new Map(); all.forEach(a => { const g = photoGroup(a); counts.set(g, (counts.get(g) || 0) + 1); });
+  const fixed = ['Uploads', 'Shoot', 'Statics', 'Studio'];
+  const groups = ['All', ...[...counts.keys()].filter(g => !fixed.includes(g)).sort(), ...fixed.filter(g => counts.has(g))];
+  if (!groups.includes(LIB.group)) LIB.group = 'All';
+  const gc = $('#bgLibGroups'); gc.innerHTML = '';
+  groups.forEach(g => {
+    const b = document.createElement('button'); b.className = 'chip'; b.type = 'button'; b.setAttribute('aria-pressed', g === LIB.group);
+    b.innerHTML = `${escapeHtml(g)}<i>${g === 'All' ? all.length : counts.get(g)}</i>`;
+    b.onclick = () => { LIB.group = g; libRemember(); renderBgPick(); };
+    gc.appendChild(b);
+  });
+
+  const q = LIB.q.trim().toLowerCase();
+  const list = all.filter(a => (LIB.group === 'All' || photoGroup(a) === LIB.group) && (!q || (a.name || '').toLowerCase().includes(q)));
   const add = document.createElement('button'); add.className = 'addtile'; add.title = 'Upload an image from your computer';
   add.innerHTML = '+<small>UPLOAD</small>'; add.onclick = () => bgUploadFlow(); c.appendChild(add);
-  [...assetsOf('photo'), ...assetsOf('bg')].forEach(a => {
+  if (!list.length) { const n = document.createElement('div'); n.className = 'none'; n.textContent = q ? `Nothing in the library matches “${LIB.q.trim()}”.` : 'No photos in this group yet.'; c.appendChild(n); }
+  list.forEach(a => {
     const b = document.createElement('button'); b.title = a.name; b.setAttribute('aria-pressed', doc.bg.type === 'image' && doc.bg.image === a.id);
-    const im = new Image(); im.src = a.url; im.alt = a.name; b.appendChild(im);
+    const im = new Image(); im.loading = 'lazy'; im.decoding = 'async'; im.src = a.url; im.alt = a.name; b.appendChild(im);
     if (!a.builtin) { const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕'; x.title = 'Remove'; x.onclick = async e => { e.stopPropagation(); if (!confirm(`Remove “${a.name}”?`)) return; await store.deleteAsset(a.id); if (doc.bg.image === a.id) { doc.bg.image = assetsOf('photo')[0]?.id || 'photo'; commit(); } renderBgPick(); refreshAssetSelects(); }; b.appendChild(x); }
     b.onclick = () => { pushUndo(); doc.bg.type = 'image'; doc.bg.image = a.id; commit(); syncAll(); };
     c.appendChild(b);
   });
 }
 function bgUploadFlow() { pickFile(f => setBackgroundFromFile(f)); }
+$('#bgLibBar').onclick = () => { LIB.open = !LIB.open; libRemember(); renderBgPick(); if (LIB.open) $('#bgPick').querySelector('[aria-pressed=true]')?.scrollIntoView({ block: 'nearest' }); };
+$('#bgLibQ').addEventListener('input', e => { LIB.q = e.target.value; renderBgPick(); });
+/* A whole folder into the library in one go. Photos already there (same name) are left
+   alone, so the same folder can be added again after more land in it. Everything stays
+   in this browser's storage — the studio has no server to send a photo to. */
+$('#bgLibFolder').onclick = () => $('#folderInput').click();
+$('#folderInput').addEventListener('change', async e => {
+  const files = [...e.target.files].filter(f => f.type.startsWith('image/')).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  e.target.value = '';
+  if (!files.length) return toast('No images in that folder');
+  const have = new Set(Object.values(assets).map(a => a.name));
+  let added = 0;
+  for (let i = 0; i < files.length; i++) {
+    const name = files[i].name.replace(/\.[^.]+$/, '').slice(0, 64);
+    setStatus(`adding photos… ${i + 1} of ${files.length}`);
+    if (have.has(name)) continue;
+    try { await store.putAsset(files[i], 'photo', name); added++; } catch (err) { console.warn(err); toast('Browser storage is full — some photos were not added'); break; }
+  }
+  setStatus('saved · this browser', 'ok');
+  LIB.open = true; LIB.group = 'All'; libRemember();
+  refreshAssetSelects(); renderBgPick(); renderPool();
+  toast(added ? `${added} photo${added > 1 ? 's' : ''} added to the library${added < files.length ? ` · ${files.length - added} already there` : ''}` : 'Every photo in that folder is already in the library');
+});
 async function setBackgroundFromFile(f) {
   if (!f.type.startsWith('image/')) return toast('That file isn’t an image');
   setStatus('adding image…');

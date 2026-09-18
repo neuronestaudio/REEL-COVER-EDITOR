@@ -29,7 +29,17 @@ loses focus). The colour is stored as a range over the text
 rather than baked into it, so it follows the words as the caption is edited, and survives word
 wrap, CAPS and re-alignment.
 
-**Backgrounds** — tile picker of every image in the library, plus upload, or drag a file
+**Photo library** — the background picker is one row until it is opened: the photo in use,
+its name and how many are in the library. Open, it is grouped (an imported set named
+`P01 - testimony - …` groups by the middle word; shoot stills, static plates and studio photos
+have groups of their own), searchable, and scrolls inside its own window, so a library of a
+hundred photos never lengthens the inspector. **+ Folder** adds every image in a folder in one
+go, skipping any already there; they stay in that browser, nothing is uploaded.
+
+**Copy and paste** — `Ctrl+C` copies the selected element, `Ctrl+V` pastes it onto this cover
+or any other (`Ctrl+X` cuts). Inside a text box the keys keep their usual meaning.
+
+**Backgrounds** — upload, or drag a file
 anywhere onto the canvas. Drag the canvas to pan, scroll to zoom, or use Fill / Fit / Reset.
 Also solid colours, gradients and six generated textures.
 
