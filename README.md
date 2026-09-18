@@ -36,6 +36,14 @@ have groups of their own), searchable, and scrolls inside its own window, so a l
 hundred photos never lengthens the inspector. **+ Folder** adds every image in a folder in one
 go, skipping any already there; they stay in that browser, nothing is uploaded.
 
+**People photos** — 78 graded stills of Harrison with students, clients, his father and the
+dojo are built in (`people.js`, `assets/people/`), grouped Testimony / Students / Father /
+People / Dojo / Karate / Women. The library grid loads 270×480 thumbnails; the 1080×1920 plate is
+fetched only when a cover uses it. A photo imported by folder before it was built in is kept
+(covers may point at it) but not listed twice. The folder is served `noindex, noimageindex`.
+Regenerate with `_cover-photo-sourcing/publish_to_studio.py`; a changed picture needs a new
+`-vN` suffix, because `/assets` is cached for a year.
+
 **Copy and paste** — `Ctrl+C` copies the selected element, `Ctrl+V` pastes it onto this cover
 or any other (`Ctrl+X` cuts). Inside a text box the keys keep their usual meaning.
 

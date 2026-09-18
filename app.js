@@ -103,6 +103,14 @@ const BUILTIN = {
   rtsShinbukan: { id: 'rtsShinbukan', kind: 'logo', name: 'Shinbukan crest', url: 'assets/brand/mark-shinbukan.png', builtin: true },
   rtsSeizanji: { id: 'rtsSeizanji', kind: 'logo', name: 'Seizanji crests', url: 'assets/brand/mark-seizanji.png', builtin: true },
 };
+/* People photos (people.js): Harrison with students, clients, his father, the dojo — graded
+   stills, built in so every browser has them. `thumb` is what the library grid loads; the
+   full plate is only fetched when a cover uses it. `group` names their library group. */
+for (const p of window.__PEOPLE_PHOTOS__ || []) BUILTIN[p.id] = { id: p.id, kind: 'photo', name: p.name, url: p.url, thumb: p.thumb, group: p.group, builtin: true };
+const BUILTIN_NAMES = new Set(Object.values(BUILTIN).map(a => a.name));
+/* A photo someone imported by folder before it was built in: still loaded, because a cover may
+   point at it, but kept out of the library so the picture is not listed twice. */
+const shadowed = a => !a.builtin && BUILTIN_NAMES.has(a.name);
 let assets = { ...BUILTIN };
 const imgCache = {};
 function getImg(id) {
@@ -794,6 +802,7 @@ const LIB = { open: false, group: 'All', q: '' };
 try { LIB.open = localStorage.getItem('rcs.libOpen') === '1'; LIB.group = localStorage.getItem('rcs.libGroup') || 'All'; } catch {}
 function libRemember() { try { localStorage.setItem('rcs.libOpen', LIB.open ? '1' : '0'); localStorage.setItem('rcs.libGroup', LIB.group); } catch {} }
 function photoGroup(a) {
+  if (a.group) return a.group;
   if (a.still) return 'Shoot';
   if (a.rts) return 'Statics';
   if (a.builtin) return 'Studio';
@@ -802,9 +811,9 @@ function photoGroup(a) {
 }
 function renderBgPick() {
   const c = $('#bgPick'); if (!c) return; c.innerHTML = '';
-  const all = [...assetsOf('photo'), ...assetsOf('bg')];
+  const all = [...assetsOf('photo'), ...assetsOf('bg')].filter(a => !shadowed(a));
   const cur = doc.bg.type === 'image' ? assets[doc.bg.image] : null;
-  const th = $('#bgLibThumb'); th.innerHTML = ''; if (cur) { const i = new Image(); i.src = cur.url; i.alt = ''; th.appendChild(i); }
+  const th = $('#bgLibThumb'); th.innerHTML = ''; if (cur) { const i = new Image(); i.src = cur.thumb || cur.url; i.alt = ''; th.appendChild(i); }
   $('#bgLibName').textContent = cur ? cur.name : 'No photo chosen';
   $('#bgLibCount').textContent = `${all.length} photos · ${LIB.open ? 'close' : 'open'} the library`;
   $('#bgLib').dataset.open = LIB.open; $('#bgLibBar').setAttribute('aria-expanded', LIB.open); $('#bgLibBody').hidden = !LIB.open;
@@ -829,7 +838,7 @@ function renderBgPick() {
   if (!list.length) { const n = document.createElement('div'); n.className = 'none'; n.textContent = q ? `Nothing in the library matches “${LIB.q.trim()}”.` : 'No photos in this group yet.'; c.appendChild(n); }
   list.forEach(a => {
     const b = document.createElement('button'); b.title = a.name; b.setAttribute('aria-pressed', doc.bg.type === 'image' && doc.bg.image === a.id);
-    const im = new Image(); im.loading = 'lazy'; im.decoding = 'async'; im.src = a.url; im.alt = a.name; b.appendChild(im);
+    const im = new Image(); im.loading = 'lazy'; im.decoding = 'async'; im.src = a.thumb || a.url; im.alt = a.name; b.appendChild(im);
     if (!a.builtin) { const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕'; x.title = 'Remove'; x.onclick = async e => { e.stopPropagation(); if (!confirm(`Remove “${a.name}”?`)) return; await store.deleteAsset(a.id); if (doc.bg.image === a.id) { doc.bg.image = assetsOf('photo')[0]?.id || 'photo'; commit(); } renderBgPick(); refreshAssetSelects(); }; b.appendChild(x); }
     b.onclick = () => { pushUndo(); doc.bg.type = 'image'; doc.bg.image = a.id; commit(); syncAll(); };
     c.appendChild(b);
@@ -1731,11 +1740,11 @@ function renderPool() {
     setStatus('saved', 'ok'); refreshAssetSelects(); renderBgPick(); renderPool(); toast(`${files.length} photo${files.length > 1 ? 's' : ''} added`);
   });
   g.appendChild(add);
-  const all = [...assetsOf('photo'), ...assetsOf('bg')];
+  const all = [...assetsOf('photo'), ...assetsOf('bg')].filter(a => !shadowed(a));
   all.forEach(a => {
     const b = document.createElement('button'); b.title = a.name;
     b.setAttribute('aria-pressed', batchOpts.pool.includes(a.id));
-    const im = new Image(); im.src = a.url; im.alt = a.name; b.appendChild(im);
+    const im = new Image(); im.loading = 'lazy'; im.decoding = 'async'; im.src = a.thumb || a.url; im.alt = a.name; b.appendChild(im);
     const t = document.createElement('span'); t.className = 'tick'; t.textContent = '✓'; b.appendChild(t);
     b.onclick = () => { const i = batchOpts.pool.indexOf(a.id); i < 0 ? batchOpts.pool.push(a.id) : batchOpts.pool.splice(i, 1); renderPool(); };
     g.appendChild(b);
