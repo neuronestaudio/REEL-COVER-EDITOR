@@ -209,8 +209,24 @@ function upperKeepLen(s) {
    layer colour. They are kept sorted and non-overlapping, so the last colour
    applied to a range is the one that shows. */
 function normSpans(l) { return Array.isArray(l && l.spans) ? l.spans.filter(s => s && s.e > s.s) : []; }
+/* A gradient fill: two or three evenly spaced stops swept across a box at an
+   angle (0 runs left to right, 90 top to bottom). The box is the glyphs the
+   gradient paints: a layer's whole text or just a span's words, so an accent word
+   carries the full sweep however long the caption is. `scope` decides whether a
+   wrapped run gets one sweep per line (the default, which reads as foil) or a
+   single sweep across all of its lines ('block'). */
+function gradStops(g) { const st = Array.isArray(g && g.stops) ? g.stops.filter(c => /^#[0-9a-f]{6}$/i.test(c)) : []; return st.length >= 2 ? st.slice(0, 3) : null; }
+function gradFill(x, b, g) {
+  const st = gradStops(g), ang = (g.angle == null ? 90 : +g.angle) * Math.PI / 180, dx = Math.cos(ang), dy = Math.sin(ang);
+  const cx = b.x + b.w / 2, cy = b.y + b.h / 2, half = Math.max((Math.abs(dx) * b.w + Math.abs(dy) * b.h) / 2, 1);
+  const gr = x.createLinearGradient(cx - dx * half, cy - dy * half, cx + dx * half, cy + dy * half);
+  st.forEach((c, i) => gr.addColorStop(i / (st.length - 1), c));
+  return gr;
+}
+/* What paints the character at source index i: a colour string, or the span
+   object itself when that span carries a gradient (its identity is the run key). */
 function spanColorAt(spans, i, base) {
-  for (const s of spans) if (i >= s.s && i < s.e) return s.color;
+  for (const s of spans) if (i >= s.s && i < s.e) return s.grad && gradStops(s.grad) ? s : s.color;
   return base;
 }
 /* Cut [s,e) out of every existing span, splitting any span that straddles it. */
@@ -326,12 +342,12 @@ function drawText(x, l, hi) {
       else { roundRect(x, lx - pad * .5, ly + lh * .16, lw + pad, lh * .78, 4); x.fill(); }
     });
   }
-  /* Preview only: the range selected in the text box, painted behind the glyphs
-     like an OS text selection so the part about to be coloured reads on the
-     poster. A wrap-inserted space (i < 0) counts only between two selected
+  /* Preview only: the range selected in the text box, outlined on the poster with
+     a faint wash, so the words being worked on are marked without tinting the
+     colour or gradient just given to them. A wrap-inserted space (i < 0) counts only between two selected
      characters. Exports never receive `hi`, so they are untouched. */
   if (hi && hi.e > hi.s) {
-    x.save(); x.fillStyle = 'rgba(72,140,255,.6)';
+    x.save(); x.fillStyle = 'rgba(72,140,255,.14)'; x.strokeStyle = 'rgba(110,170,255,.95)'; x.lineWidth = Math.max(3, l.size * 0.035);
     lines.forEach((ln, i) => {
       const lw = widths[i]; const lx = l.align === 'left' ? left : l.align === 'right' ? left + bw - lw : left + (bw - lw) / 2;
       const ty = top + i * lh + lh * 0.5 + l.size * 0.34;
@@ -341,7 +357,7 @@ function drawText(x, l, hi) {
         if (!on[a]) { a++; continue; }
         let b = a; while (b < on.length && on[b]) b++;
         const ox = lx + (a ? x.measureText(ln.text.slice(0, a)).width : 0), w = x.measureText(ln.text.slice(a, b)).width;
-        roundRect(x, ox - l.size * 0.04, ty - l.size * 0.76, w + l.size * 0.08, l.size * 0.98, l.size * 0.06); x.fill();
+        roundRect(x, ox - l.size * 0.04, ty - l.size * 0.76, w + l.size * 0.08, l.size * 0.98, l.size * 0.06); x.fill(); x.stroke();
         a = b;
       }
     });
@@ -352,18 +368,39 @@ function drawText(x, l, hi) {
      position; doing it this way lets each run carry its own fill. */
   x.textAlign = 'left';
   const baseOff = lh * 0.5 + l.size * 0.34;
+  /* Two passes: lay the runs out first, so a gradient span knows the full extent
+     of its words (even across a wrap) before anything is painted. */
+  const basePaint = l.grad && l.grad.on && gradStops(l.grad) ? l.grad : l.color;
+  const laid = [], gbox = new Map(), gradOf = p => p === l.grad ? l.grad : p.grad;
   lines.forEach((ln, i) => {
     const lw = widths[i];
     const lx = l.align === 'left' ? left : l.align === 'right' ? left + bw - lw : left + (bw - lw) / 2;
     const ty = top + i * lh + baseOff;
-    for (const r of colorRuns(ln, spans, l.color)) {
+    for (const r of colorRuns(ln, spans, basePaint)) {
       const seg = ln.text.slice(r.a, r.b); if (!seg) continue;
       const ox = lx + (r.a ? x.measureText(ln.text.slice(0, r.a)).width : 0);
-      if (l.outline > 0) { x.save(); x.lineJoin = 'round'; x.lineWidth = l.outline * 2; x.strokeStyle = l.boxColor; x.strokeText(seg, ox, ty); x.restore(); }
-      if (l.shadow > 0) { x.shadowColor = `rgba(0,0,0,${l.shadow})`; x.shadowBlur = l.size * .25; x.shadowOffsetY = l.size * .05; }
-      x.fillStyle = r.color; x.fillText(seg, ox, ty); x.shadowColor = 'transparent';
+      let key = 0;
+      if (typeof r.color === 'object') { // grow this gradient's box over the glyphs it paints: one per line, or one for the lot
+        key = gradOf(r.color).scope === 'block' ? -1 : i;
+        let m = gbox.get(r.color); if (!m) gbox.set(r.color, m = new Map());
+        const w = x.measureText(seg).width, b = m.get(key) || { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+        b.x0 = Math.min(b.x0, ox); b.x1 = Math.max(b.x1, ox + w); b.y0 = Math.min(b.y0, ty - l.size * 0.76); b.y1 = Math.max(b.y1, ty + l.size * 0.22);
+        m.set(key, b);
+      }
+      laid.push({ seg, ox, ty, paint: r.color, key });
     }
   });
+  const fillOf = r => {
+    if (typeof r.paint === 'string') return r.paint;
+    const b = gbox.get(r.paint).get(r.key);
+    if (!b.fill) b.fill = gradFill(x, { x: b.x0, y: b.y0, w: b.x1 - b.x0, h: b.y1 - b.y0 }, gradOf(r.paint));
+    return b.fill;
+  };
+  for (const r of laid) {
+    if (l.outline > 0) { x.save(); x.lineJoin = 'round'; x.lineWidth = l.outline * 2; x.strokeStyle = l.boxColor; x.strokeText(r.seg, r.ox, r.ty); x.restore(); }
+    if (l.shadow > 0) { x.shadowColor = `rgba(0,0,0,${l.shadow})`; x.shadowBlur = l.size * .25; x.shadowOffsetY = l.size * .05; }
+    x.fillStyle = fillOf(r); x.fillText(r.seg, r.ox, r.ty); x.shadowColor = 'transparent';
+  }
   x.restore();
   return box;
 }
@@ -988,9 +1025,9 @@ bound.push(bindRange('tLine', () => T()?.line, v => { const l = T(); if (l) l.li
 bound.push(bindRange('tTrack', () => T()?.track, v => { const l = T(); if (l) l.track = v; }, v => (v * 100).toFixed(0)));
 bound.push(bindRange('tWidth', () => T()?.width, v => { const l = T(); if (l) l.width = v; }, v => Math.round(v * 100) + '%'));
 const alChips = $('[data-al]').parentElement; bound.push(bindChips(alChips.id || (alChips.id = 'alChips'), 'al', () => T()?.align, v => { const l = T(); if (l) l.align = v; }));
-bound.push(bindColor('tColor', () => T()?.color, v => { const l = T(); if (l) l.color = v; }));
+bound.push(bindColor('tColor', () => T()?.color, v => { const l = T(); if (l) { l.color = v; if (l.grad && l.grad.on) { l.grad.on = false; syncGradUI(); } } }));
 $('#tSwatches').innerHTML = SWATCH.slice(0, 8).map(c => `<button class="sw" style="background:${c};width:16px;height:16px" data-c="${c}"></button>`).join('');
-$('#tSwatches').onclick = e => { const c = e.target.dataset.c, l = T(); if (c && l) { pushUndo(); l.color = c; commit(); syncAll(); } };
+$('#tSwatches').onclick = e => { const c = e.target.dataset.c, l = T(); if (c && l) { pushUndo(); l.color = c; if (l.grad) l.grad.on = false; commit(); syncAll(); } };
 /* Part colour — recolour just the words selected in the text box, so one
    heading can carry an accent without being split into separate layers. The
    selection is mirrored into `tSel` because clicking a swatch moves focus, and
@@ -1029,6 +1066,7 @@ function syncSpanUI() {
   syncTextHi();
   const key = live ? `${l.id}:${tSel.s}:${tSel.e}` : '';
   if (key !== tHiKey) { tHiKey = key; renderAll(); }   // the poster highlights the same range
+  syncGradUI();
 }
 /* Named apart from the tile-span `applySpan` below: both sit in the same scope,
    and a second `function applySpan` silently replaced this one, which is how
@@ -1052,6 +1090,81 @@ $('#tSpanClear').onclick = () => {
   l.spans = tSel ? clipSpans(normSpans(l), tSel.s, tSel.e) : [];
   commit(); renderLayers(); syncSpanUI();
 };
+/* Gradient fill. One set of controls serves two targets, the way the eye reads
+   it: words selected in the box take the gradient as a span (so it follows them
+   through edits and wraps, like part colour); with nothing selected it fills the
+   whole layer. Picking a flat Colour switches the layer gradient back off. */
+const GRAD_PRESETS = [
+  { n: 'Gold foil', stops: ['#fbeeb8', '#d9a441', '#8c5a1a'], angle: 90 },
+  { n: 'Champagne', stops: ['#ffffff', '#e9d9b5'], angle: 90 },
+  { n: 'Ember', stops: ['#f6c56a', '#b8412e'], angle: 90 },
+  { n: 'Flame', stops: ['#fff1b8', '#f08a24', '#b8412e'], angle: 90 },
+  { n: 'Rose gold', stops: ['#f9d9c8', '#c98a6b'], angle: 90 },
+  { n: 'Sunrise', stops: ['#f2c6b6', '#d9a441'], angle: 0 },
+  { n: 'Sage', stops: ['#d7efe6', '#7fb3a6'], angle: 90 },
+  { n: 'Deep teal', stops: ['#7fb3a6', '#0f3b3a'], angle: 90 },
+  { n: 'Moss', stops: ['#c9d6a3', '#5b6b3a'], angle: 90 },
+  { n: 'Dusk', stops: ['#f2c6b6', '#2b2b6d'], angle: 45 },
+  { n: 'Chrome', stops: ['#ffffff', '#aeb4bb', '#f4f4f4'], angle: 90 },
+  { n: 'Ink fade', stops: ['#ffffff', '#8c8377'], angle: 90 },
+];
+const cleanGrad = g => ({ stops: gradStops(g).slice(), angle: g.angle == null ? 90 : +g.angle, scope: g.scope === 'block' ? 'block' : 'line' });
+const sameGrad = (p, g) => p.angle === g.angle && p.stops.join() === g.stops.join();
+const mixHex = (c1, c2) => '#' + [1, 3, 5].map(k => Math.round((parseInt(c1.slice(k, k + 2), 16) + parseInt(c2.slice(k, k + 2), 16)) / 2).toString(16).padStart(2, '0')).join('');
+let gradDraft = cleanGrad(GRAD_PRESETS[0]), gradBefore = null;
+function gradCurrent() {
+  const l = T(); if (!l) return null;
+  if (tSel) { const sp = normSpans(l).find(s => s.grad && gradStops(s.grad) && s.s < tSel.e && s.e > tSel.s); return sp ? sp.grad : null; }
+  return l.grad && l.grad.on && gradStops(l.grad) ? l.grad : null;
+}
+function gradApply(g) {
+  const l = T(); if (!l || !gradStops(g)) return;
+  g = cleanGrad(g); gradDraft = cleanGrad(g);
+  if (tSel) l.spans = clipSpans(normSpans(l), tSel.s, tSel.e).concat([{ s: tSel.s, e: tSel.e, color: g.stops[0], grad: g }]).sort((a, b) => a.s - b.s);
+  else l.grad = { on: true, ...g };
+  renderAll(); renderLayers(); syncSpanUI();
+}
+function gradRemove() {
+  const l = T(); if (!l || !gradCurrent()) return;
+  if (tSel) l.spans = clipSpans(normSpans(l), tSel.s, tSel.e); else l.grad.on = false;
+  renderAll(); renderLayers(); syncSpanUI();
+}
+const gradFromUI = () => ({ stops: [$('#tGradA').value, ...($('#tGradM').hidden ? [] : [$('#tGradM').value]), $('#tGradB').value], angle: +$('#tGradAngle').value, scope: $('#tGradScope [aria-pressed=true]')?.dataset.scope || 'line' });
+function syncGradUI() {
+  const l = T(); if (!l) return;
+  const cur = gradCurrent(), g = cur ? cleanGrad(cur) : gradDraft, on = !!cur, mid = g.stops.length === 3;
+  $('#tGradOn').setAttribute('aria-pressed', on); $('#tGradOff').setAttribute('aria-pressed', !on);
+  $('#tGradCtl').hidden = !on;
+  $('#tGradFor').textContent = tSel ? 'selected words' : 'whole text';
+  $('#tGradA').value = g.stops[0]; $('#tGradB').value = g.stops[g.stops.length - 1];
+  $('#tGradM').hidden = !mid; if (mid) $('#tGradM').value = g.stops[1];
+  $('#tGradMid').textContent = mid ? '\u2212 Mid' : '+ Mid';
+  $('#tGradAngle').value = g.angle; $('#tGradAngleV').textContent = g.angle + '\u00b0';
+  $('#tGradBar').style.background = `linear-gradient(90deg, ${g.stops.join(', ')})`;
+  $$('#tGradPresets .gsw').forEach((b, i) => b.setAttribute('aria-pressed', on && sameGrad(GRAD_PRESETS[i], g)));
+  $$('#tGradDirs .chip').forEach(b => b.setAttribute('aria-pressed', on && +b.dataset.ang === g.angle));
+  $$('#tGradScope .chip').forEach(b => b.setAttribute('aria-pressed', b.dataset.scope === g.scope));
+  const word = tSel ? `\u201c${(l.upper ? upperKeepLen(l.text) : l.text).slice(tSel.s, tSel.e)}\u201d` : '';
+  $('#tGradHint').textContent = tSel
+    ? (on ? `Gradient on ${word}. Click in the box to work on the whole text instead.` : `Pick a gradient to fill just ${word}.`)
+    : (on ? 'Gradient fills the whole text. Select words in the box to give only those their own.' : 'Pick a gradient for the whole text, or select words in the box first to fill only those.');
+}
+$('#tGradPresets').innerHTML = GRAD_PRESETS.map((p, i) => `<button class="gsw" type="button" data-i="${i}" title="${p.n}" style="background:linear-gradient(${p.angle + 90}deg, ${p.stops.join(', ')})"></button>`).join('');
+// Buttons keep the text box's focus and selection, the way the part-colour swatches do.
+['#tGradPresets', '#tGradOn', '#tGradOff', '#tGradMid', '#tGradSwap', '#tGradDirs', '#tGradScope'].forEach(s => $(s).addEventListener('mousedown', e => e.preventDefault()));
+const gradClick = fn => () => { if (!T()) return; pushUndo(); fn(); scheduleSave(); };
+$('#tGradPresets').onclick = e => { const p = GRAD_PRESETS[e.target.dataset.i]; if (p) gradClick(() => gradApply({ ...p, scope: gradFromUI().scope }))(); };
+$('#tGradScope').onclick = e => { const v = e.target.dataset.scope; if (v) gradClick(() => { const g = gradFromUI(); g.scope = v; gradApply(g); })(); };
+$('#tGradOn').onclick = gradClick(() => { if (!gradCurrent()) gradApply(gradDraft); });
+$('#tGradOff').onclick = gradClick(() => gradRemove());
+$('#tGradSwap').onclick = gradClick(() => { const g = gradFromUI(); g.stops.reverse(); gradApply(g); });
+$('#tGradMid').onclick = gradClick(() => { const g = gradFromUI(); g.stops = g.stops.length === 3 ? [g.stops[0], g.stops[2]] : [g.stops[0], mixHex(g.stops[0], g.stops[1]), g.stops[1]]; gradApply(g); });
+$('#tGradDirs').onclick = e => { const v = e.target.dataset.ang; if (v != null) gradClick(() => { const g = gradFromUI(); g.angle = +v; gradApply(g); })(); };
+// Pickers and the slider edit live; one undo step covers the whole drag.
+['#tGradA', '#tGradM', '#tGradB', '#tGradAngle'].forEach(s => {
+  $(s).addEventListener('input', () => { if (!T()) return; if (!gradBefore) gradBefore = snapshot(); gradApply(gradFromUI()); });
+  $(s).addEventListener('change', () => { if (gradBefore) { undoStack.push(gradBefore); redoStack = []; updateUndoBtns(); gradBefore = null; scheduleSave(); } });
+});
 const boxChips = $('[data-box]').parentElement; bound.push(bindChips(boxChips.id || (boxChips.id = 'boxChips'), 'box', () => T()?.box, v => { const l = T(); if (l) l.box = v; }));
 bound.push(bindColor('tBoxColor', () => T()?.boxColor, v => { const l = T(); if (l) l.boxColor = v; }));
 bound.push(bindRange('tBoxAlpha', () => T()?.boxAlpha, v => { const l = T(); if (l) l.boxAlpha = v; }));

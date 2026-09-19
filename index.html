@@ -88,6 +88,18 @@ aside.right{border-left:1px solid var(--line)}
 .chip{padding:3px 8px;border-radius:99px;border:1px solid var(--line);background:var(--ink);font-size:11.5px;cursor:pointer;color:var(--muted)}
 .chip[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
 .swatches{display:flex;flex-wrap:wrap;gap:5px}
+/* Gradient fill for text: presets, two or three colours, an angle. */
+.gradbox{border:1px solid var(--line);border-radius:10px;padding:2px 9px 9px;margin:0 0 10px;background:linear-gradient(180deg,var(--raised),var(--panel))}
+.gradbox .row{margin:6px 0}
+.gradfor{font:10px var(--font-mono);color:var(--dim);margin-left:auto;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.gradpresets{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin:2px 0 8px}
+.gsw{height:22px;border-radius:5px;border:1px solid rgba(255,255,255,.14);cursor:pointer;padding:0;min-width:0}
+.gsw:hover{transform:scale(1.06)}
+.gsw[aria-pressed=true]{outline:2px solid var(--accent);outline-offset:1px}
+.gradbar{height:10px;border-radius:99px;border:1px solid var(--line);margin:0 0 6px}
+.gradbox .chip{white-space:nowrap}
+.gradbox input[type=color]{flex:0 0 34px}
+.gradbox .notice{margin:6px 0 0;padding:6px 9px;font-size:11.5px}
 .sw{width:22px;height:22px;border-radius:4px;border:1px solid rgba(255,255,255,.12);cursor:pointer}
 .sw:hover{transform:scale(1.08)}
 /* background picker */
@@ -526,6 +538,30 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
       <div class="notice" style="margin:-2px 0 10px;display:flex;align-items:center;gap:8px">
         <span id="tSpanHint" style="flex:1"></span>
         <button class="small ghost" id="tSpanClear" title="Give the selection back the layer colour">Clear</button>
+      </div>
+      <div class="gradbox" id="tGradBox">
+        <div class="row"><label>Gradient</label><div class="ctl chips">
+          <button class="chip" id="tGradOff" type="button">Off</button><button class="chip" id="tGradOn" type="button">On</button>
+          <span class="gradfor" id="tGradFor">whole text</span>
+        </div></div>
+        <div class="gradpresets" id="tGradPresets"></div>
+        <div id="tGradCtl" hidden>
+          <div class="gradbar" id="tGradBar"></div>
+          <div class="row"><label>Colours</label><div class="ctl">
+            <input type="color" id="tGradA" title="Start colour"><input type="color" id="tGradM" title="Middle colour" hidden><input type="color" id="tGradB" title="End colour">
+            <span style="flex:1"></span>
+            <button class="chip" id="tGradMid" type="button" title="Add or remove a middle colour">+ Mid</button>
+            <button class="chip" id="tGradSwap" type="button" title="Swap the two ends">&#8644; Swap</button>
+          </div></div>
+          <div class="row"><label for="tGradAngle">Angle</label><div class="ctl"><input type="range" id="tGradAngle" min="0" max="360" step="5"><span class="val" id="tGradAngleV"></span></div></div>
+          <div class="row"><label>Direction</label><div class="ctl chips" id="tGradDirs">
+            <button class="chip" type="button" data-ang="90" title="Top to bottom">&#8595;</button><button class="chip" type="button" data-ang="0" title="Left to right">&#8594;</button><button class="chip" type="button" data-ang="45" title="Diagonal down">&#8600;</button><button class="chip" type="button" data-ang="315" title="Diagonal up">&#8599;</button>
+          </div></div>
+          <div class="row"><label>Sweep</label><div class="ctl chips" id="tGradScope">
+            <button class="chip" type="button" data-scope="line" title="Every line carries the full gradient, like foil">Each line</button><button class="chip" type="button" data-scope="block" title="One gradient across the whole block of text">Whole block</button>
+          </div></div>
+        </div>
+        <div class="notice" id="tGradHint"></div>
       </div>
       <div class="row"><label>Box</label><div class="ctl chips">
         <button class="chip" data-box="none">None</button><button class="chip" data-box="pill">Pill</button><button class="chip" data-box="block">Block</button><button class="chip" data-box="highlight">Highlight</button>
