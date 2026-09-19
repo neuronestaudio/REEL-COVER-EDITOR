@@ -112,6 +112,13 @@ aside.right{border-left:1px solid var(--line)}
 .bgpick .addtile small{display:block;font-size:8.5px;letter-spacing:.06em;margin-top:2px}
 .bgpick .x{position:absolute;right:2px;top:2px;display:none;width:15px;height:15px;padding:0;font-size:9px;line-height:1;border-radius:3px;background:rgba(0,0,0,.75);border-color:transparent}
 .bgpick button:hover .x{display:block}
+.bgpick .up{position:absolute;right:2px;bottom:2px;display:none;width:15px;height:15px;padding:0;font-size:10px;line-height:1;border-radius:3px;background:rgba(0,0,0,.75);border-color:transparent;color:var(--accent)}
+.bgpick button:hover .up{display:block}
+.bgpick .cloud{position:absolute;left:2px;bottom:2px;font:600 6.5px var(--font-mono);letter-spacing:.08em;padding:2px 3px;border-radius:3px;background:rgba(0,0,0,.72);color:var(--teal);pointer-events:none}
+.lib__shared{display:flex;align-items:center;gap:8px;margin:0 0 7px;padding:5px 6px 5px 9px;border:1px dashed var(--line-2);border-radius:8px;font-size:11.5px;color:var(--muted);line-height:1.3}
+.lib__shared span{flex:1;min-width:0}
+.lib__shared b{color:var(--text);font-weight:600}
+.lib__shared button{white-space:nowrap}
 /* photo library — a single row until it is opened */
 .lib{border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,var(--raised),var(--panel));overflow:hidden}
 .lib[data-open=true]{border-color:var(--line-2)}
@@ -436,11 +443,13 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
               <input type="search" id="bgLibQ" placeholder="Search the library…" aria-label="Search photos" autocomplete="off">
               <button class="small" id="bgLibFolder" type="button" title="Add every image in a folder to the library. They stay in this browser — nothing is uploaded anywhere.">+ Folder</button>
             </div>
+            <div class="lib__shared"><span id="bgLibSharedMsg">Shared library</span><button class="small" id="bgLibShare" type="button" title="Upload photos to the shared library. Everyone who opens the studio gets them.">&#8682; Upload for everyone</button></div>
             <div class="chips lib__groups" id="bgLibGroups"></div>
             <div class="bgpick lib__grid" id="bgPick"></div>
           </div>
         </div>
         <input type="file" id="folderInput" webkitdirectory multiple hidden>
+        <input type="file" id="shareInput" accept="image/*" multiple hidden>
         <div class="row" style="margin-top:8px"><label>Fit</label><div class="ctl chips">
           <button class="chip" id="bgFill" title="Cover the whole frame">Fill frame</button>
           <button class="chip" id="bgFit" title="Show the whole image, letterboxed">Fit whole</button>

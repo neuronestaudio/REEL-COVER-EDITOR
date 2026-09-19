@@ -110,8 +110,20 @@ for (const p of window.__PEOPLE_PHOTOS__ || []) BUILTIN[p.id] = { id: p.id, kind
 const BUILTIN_NAMES = new Set(Object.values(BUILTIN).map(a => a.name));
 /* A photo someone imported by folder before it was built in: still loaded, because a cover may
    point at it, but kept out of the library so the picture is not listed twice. */
-const shadowed = a => !a.builtin && BUILTIN_NAMES.has(a.name);
-let assets = { ...BUILTIN };
+const shadowed = a => !a.builtin && !a.shared && (BUILTIN_NAMES.has(a.name) || (sharedLocal.has(a.id) && Object.values(SHARED).some(s => s.name === a.name)));
+/* Shared photos (api/photos.js) sit in `assets` beside the built-ins under ids of the
+   form sh_<id>, the same in every browser, so a cover that uses one travels. SHARED
+   starts from the last listing this browser saw; `sharedLocal` remembers which of this
+   browser's own uploads were sent up, so the library does not list that picture twice. */
+const sharedAsset = p => ({ id: 'sh_' + p.id, kind: 'photo', name: p.name, url: p.url, thumb: p.thumb || p.url, group: 'Shared', shared: true, sid: p.id, at: p.at });
+const SHARED = {};
+let sharedLocal = new Set();
+try {
+  for (const p of JSON.parse(localStorage.getItem('rcs.sharedCache') || '[]')) { const s = sharedAsset(p); SHARED[s.id] = s; }
+  sharedLocal = new Set(JSON.parse(localStorage.getItem('rcs.sharedLocal') || '[]'));
+} catch {}
+function sharedLocalAdd(id) { sharedLocal.add(id); try { localStorage.setItem('rcs.sharedLocal', JSON.stringify([...sharedLocal])); } catch {} }
+let assets = { ...BUILTIN, ...SHARED };
 const imgCache = {};
 function getImg(id) {
   if (!id || !assets[id]) return null;
@@ -521,7 +533,7 @@ const store = {
   idb() { return new Promise((res, rej) => { const r = indexedDB.open('rcs', 1); r.onupgradeneeded = () => r.result.createObjectStore('assets', { keyPath: 'id' }); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
   async rows() { const db = await this.idb(); return new Promise((res, rej) => { const t = db.transaction('assets').objectStore('assets').getAll(); t.onsuccess = () => res(t.result); t.onerror = () => rej(t.error); }); },
   async loadAssets() {
-    assets = { ...BUILTIN };
+    assets = { ...BUILTIN, ...SHARED };
     try { (await this.rows()).forEach(r => assets[r.id] = { id: r.id, kind: r.kind, name: r.name, url: URL.createObjectURL(r.blob) }); }
     catch (e) { console.warn('IndexedDB unavailable', e); }
   },
@@ -532,7 +544,7 @@ const store = {
     const rec = { id, kind, name, url: URL.createObjectURL(blob) }; assets[id] = rec; return rec;
   },
   async deleteAsset(id) {
-    if (assets[id]?.builtin) return;
+    if (assets[id]?.builtin || assets[id]?.shared) return;
     const db = await this.idb();
     await new Promise(res => { const t = db.transaction('assets', 'readwrite'); t.objectStore('assets').delete(id); t.oncomplete = res; t.onerror = res; });
     delete assets[id]; delete imgCache[id];
@@ -856,9 +868,13 @@ function renderBgPick() {
   $('#bgLib').dataset.open = LIB.open; $('#bgLibBar').setAttribute('aria-expanded', LIB.open); $('#bgLibBody').hidden = !LIB.open;
   if (!LIB.open) return;
 
+  const nShared = Object.keys(SHARED).length;
+  $('#bgLibSharedMsg').innerHTML = share.ok === false ? 'Shared photos are offline here.'
+    : `<b>Shared</b> · ${nShared} photo${nShared === 1 ? '' : 's'} for everyone`;
+  $('#bgLibShare').disabled = share.ok === false || share.busy;
   const counts = new Map(); all.forEach(a => { const g = photoGroup(a); counts.set(g, (counts.get(g) || 0) + 1); });
   const fixed = ['Uploads', 'Shoot', 'Statics', 'Studio'];
-  const groups = ['All', ...[...counts.keys()].filter(g => !fixed.includes(g)).sort(), ...fixed.filter(g => counts.has(g))];
+  const groups = ['All', ...(counts.has('Shared') ? ['Shared'] : []), ...[...counts.keys()].filter(g => g !== 'Shared' && !fixed.includes(g)).sort(), ...fixed.filter(g => counts.has(g))];
   if (!groups.includes(LIB.group)) LIB.group = 'All';
   const gc = $('#bgLibGroups'); gc.innerHTML = '';
   groups.forEach(g => {
@@ -876,7 +892,8 @@ function renderBgPick() {
   list.forEach(a => {
     const b = document.createElement('button'); b.title = a.name; b.setAttribute('aria-pressed', doc.bg.type === 'image' && doc.bg.image === a.id);
     const im = new Image(); im.loading = 'lazy'; im.decoding = 'async'; im.src = a.thumb || a.url; im.alt = a.name; b.appendChild(im);
-    if (!a.builtin) { const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕'; x.title = 'Remove'; x.onclick = async e => { e.stopPropagation(); if (!confirm(`Remove “${a.name}”?`)) return; await store.deleteAsset(a.id); if (doc.bg.image === a.id) { doc.bg.image = assetsOf('photo')[0]?.id || 'photo'; commit(); } renderBgPick(); refreshAssetSelects(); }; b.appendChild(x); }
+    if (a.shared) sharedTile(b, a);
+    else if (!a.builtin) { localShareBtn(b, a); const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕'; x.title = 'Remove'; x.onclick = async e => { e.stopPropagation(); if (!confirm(`Remove “${a.name}”?`)) return; await store.deleteAsset(a.id); if (doc.bg.image === a.id) { doc.bg.image = assetsOf('photo')[0]?.id || 'photo'; commit(); } renderBgPick(); refreshAssetSelects(); }; b.appendChild(x); }
     b.onclick = () => { pushUndo(); doc.bg.type = 'image'; doc.bg.image = a.id; commit(); syncAll(); };
     c.appendChild(b);
   });
@@ -885,8 +902,8 @@ function bgUploadFlow() { pickFile(f => setBackgroundFromFile(f)); }
 $('#bgLibBar').onclick = () => { LIB.open = !LIB.open; libRemember(); renderBgPick(); if (LIB.open) $('#bgPick').querySelector('[aria-pressed=true]')?.scrollIntoView({ block: 'nearest' }); };
 $('#bgLibQ').addEventListener('input', e => { LIB.q = e.target.value; renderBgPick(); });
 /* A whole folder into the library in one go. Photos already there (same name) are left
-   alone, so the same folder can be added again after more land in it. Everything stays
-   in this browser's storage — the studio has no server to send a photo to. */
+   alone, so the same folder can be added again after more land in it. These stay in
+   this browser's storage; "Upload for everyone" is what sends a photo to the server. */
 $('#bgLibFolder').onclick = () => $('#folderInput').click();
 $('#folderInput').addEventListener('change', async e => {
   const files = [...e.target.files].filter(f => f.type.startsWith('image/')).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
@@ -904,6 +921,121 @@ $('#folderInput').addEventListener('change', async e => {
   LIB.open = true; LIB.group = 'All'; libRemember();
   refreshAssetSelects(); renderBgPick(); renderPool();
   toast(added ? `${added} photo${added > 1 ? 's' : ''} added to the library${added < files.length ? ` · ${files.length - added} already there` : ''}` : 'Every photo in that folder is already in the library');
+});
+/* ---------------- shared library ----------------
+   Photos every browser gets. api/photos.js keeps them in the project's Blob store; this
+   side lists them into `assets` beside the built-ins and sends new ones up after shrinking
+   them (a cover is 1080 wide, so nothing over 2400 px is ever needed, and the platform
+   caps a request at 4.5 MB). The last listing is cached, so a cover that uses a shared
+   photo still paints before the network answers. Covers themselves stay in the browser
+   that made them; only photos are shared. */
+const share = { ok: null, busy: false, max: 300 };
+const SHARE_API = 'api/photos';
+function sharedCacheSave() { try { localStorage.setItem('rcs.sharedCache', JSON.stringify(Object.values(SHARED).map(a => ({ id: a.sid, name: a.name, url: a.url, thumb: a.thumb, at: a.at })))); } catch {} }
+function sharedBust() { try { localStorage.setItem('rcs.sharedBust', String(Date.now())); } catch {} }
+function sharedRefreshUI() { if (!doc) return; refreshAssetSelects(); renderBgPick(); renderPool(); renderAll(); }
+async function loadShared() {
+  // Someone who has just uploaded or removed a photo skips the edge cache for a while.
+  let q = ''; try { const t = +localStorage.getItem('rcs.sharedBust'); if (t && Date.now() - t < 15 * 60e3) q = '?t=' + t; } catch {}
+  try {
+    const r = await fetch(SHARE_API + q, { headers: { accept: 'application/json' } });
+    if (!r.ok || !/json/.test(r.headers.get('content-type') || '')) throw new Error('no shared library here');
+    const data = await r.json(); share.ok = true; share.max = data.max || share.max;
+    for (const k of Object.keys(SHARED)) { delete assets[k]; delete SHARED[k]; }
+    for (const p of data.photos || []) { const a = sharedAsset(p); SHARED[a.id] = a; assets[a.id] = a; }
+    sharedCacheSave();
+  } catch (e) { share.ok = false; }
+  sharedRefreshUI();
+}
+function shareKey() {
+  let k = null; try { k = localStorage.getItem('rcs.shareKey'); } catch {}
+  if (k) return k;
+  k = (prompt('Team upload key\n\nPhotos you upload here go to the shared library, where everyone who opens the studio gets them. Ask Dion for the key. It is remembered on this device.') || '').trim();
+  if (!k) return null;
+  try { localStorage.setItem('rcs.shareKey', k); } catch {}
+  return k;
+}
+function forgetShareKey() { try { localStorage.removeItem('rcs.shareKey'); } catch {} }
+const b64url = s => btoa(String.fromCharCode(...new TextEncoder().encode(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+async function shrinkToJpeg(src, edge, q) {
+  const bmp = await createImageBitmap(src);   // honours the photo's EXIF rotation
+  const s = Math.min(1, edge / Math.max(bmp.width, bmp.height)), w = Math.max(1, Math.round(bmp.width * s)), h = Math.max(1, Math.round(bmp.height * s));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, w, h); x.imageSmoothingQuality = 'high'; x.drawImage(bmp, 0, 0, w, h);
+  if (bmp.close) bmp.close();
+  return new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('That image could not be read')), 'image/jpeg', q));
+}
+async function shareOne(src, name, key) {
+  let full = await shrinkToJpeg(src, 2400, 0.9);
+  if (full.size > 4e6) full = await shrinkToJpeg(src, 2400, 0.8);
+  if (full.size > 4e6) full = await shrinkToJpeg(src, 1920, 0.8);
+  const thumb = await shrinkToJpeg(full, 480, 0.8);
+  const id = Array.from(crypto.getRandomValues(new Uint8Array(10)), v => 'abcdefghijklmnopqrstuvwxyz0123456789'[v % 36]).join('');
+  const meta = b64url(JSON.stringify({ n: name }));
+  const send = async (kind, blob) => {
+    const r = await fetch(`${SHARE_API}?id=${id}&kind=${kind}&meta=${meta}`, { method: 'POST', headers: { 'content-type': 'image/jpeg', 'x-studio-key': key }, body: blob });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { const e = new Error(j.error || 'The upload did not go through'); e.status = r.status; throw e; }
+    return j;
+  };
+  const t = await send('thumb', thumb), f = await send('full', full);   // the full image is what lists it, so it goes last
+  return sharedAsset({ id, name, url: f.url, thumb: t.url, at: Date.now() });
+}
+/* items: [{ src: Blob, name, localId? }]. A name already in the shared library is left
+   alone, so the same batch can be sent twice without doubling up. */
+async function shareFiles(items) {
+  if (share.busy || !items.length) return;
+  if (share.ok === false) return toast('The shared library is not available here');
+  const key = shareKey(); if (!key) return;
+  share.busy = true; let done = 0, skipped = 0, fail = '';
+  const names = new Set(Object.values(SHARED).map(a => a.name));
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i]; setStatus(`uploading for everyone… ${i + 1} of ${items.length}`);
+    if (names.has(it.name)) { skipped++; if (it.localId) sharedLocalAdd(it.localId); continue; }
+    try {
+      const a = await shareOne(it.src, it.name, key);
+      SHARED[a.id] = a; assets[a.id] = a; names.add(a.name); done++;
+      if (it.localId) sharedLocalAdd(it.localId);
+    } catch (e) {
+      fail = e.message || 'The upload did not go through';
+      if (e.status === 401) { forgetShareKey(); fail = 'That upload key was not accepted. Try again with the right key.'; }
+      if (e.status === 401 || e.status === 409) break;
+    }
+  }
+  share.busy = false; setStatus('saved · this browser', 'ok');
+  if (done) { sharedCacheSave(); sharedBust(); LIB.open = true; LIB.group = 'Shared'; libRemember(); }
+  sharedRefreshUI();
+  toast(fail ? (done ? `${done} uploaded, then: ${fail}` : fail)
+    : done ? `${done} photo${done > 1 ? 's' : ''} now in the shared library, for everyone${skipped ? ` · ${skipped} already there` : ''}`
+      : 'Those photos are already in the shared library');
+}
+async function sharedDelete(a) {
+  if (!confirm(`Remove “${a.name}” from the shared library?\n\nIt disappears for everyone, and any cover using it loses its photo.`)) return;
+  const key = shareKey(); if (!key) return;
+  let r; try { r = await fetch(`${SHARE_API}?id=${a.sid}`, { method: 'DELETE', headers: { 'x-studio-key': key } }); } catch { return toast('Could not reach the shared library'); }
+  if (r.status === 401) { forgetShareKey(); return toast('That upload key was not accepted. Try again with the right key.'); }
+  if (!r.ok) return toast('That photo could not be removed');
+  delete SHARED[a.id]; delete assets[a.id]; sharedCacheSave(); sharedBust();
+  if (doc.bg.image === a.id) { doc.bg.image = assetsOf('photo')[0]?.id || 'photo'; commit(); }
+  sharedRefreshUI(); toast('Removed from the shared library');
+}
+function sharedTile(b, a) {
+  const c = document.createElement('span'); c.className = 'cloud'; c.textContent = 'SHARED'; b.appendChild(c);
+  const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕'; x.title = 'Remove from the shared library, for everyone';
+  x.onclick = e => { e.stopPropagation(); sharedDelete(a); }; b.appendChild(x);
+}
+function localShareBtn(b, a) {
+  if (share.ok === false) return;
+  const u = document.createElement('button'); u.className = 'up'; u.textContent = '⇪'; u.title = 'Upload to the shared library, so everyone gets this photo';
+  u.onclick = async e => { e.stopPropagation(); try { const src = await fetch(a.url).then(r => r.blob()); shareFiles([{ src, name: a.name, localId: a.id }]); } catch { toast('That photo could not be read'); } };
+  b.appendChild(u);
+}
+$('#bgLibShare').onclick = () => $('#shareInput').click();
+$('#shareInput').addEventListener('change', e => {
+  const files = [...e.target.files].filter(f => f.type.startsWith('image/')).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  e.target.value = '';
+  if (!files.length) return toast('No images chosen');
+  shareFiles(files.map(f => ({ src: f, name: f.name.replace(/\.[^.]+$/, '').slice(0, 64) })));
 });
 async function setBackgroundFromFile(f) {
   if (!f.type.startsWith('image/')) return toast('That file isn’t an image');
@@ -1467,7 +1599,7 @@ const CUT_BGS = {
 function bgDocFrom(b) { const d = baseDoc(''); d.bg = { ...d.bg, ...b }; d.subject.on = false; d.overlay.type = 'none'; return d; }
 function renderCutoutView() {
   if (!$('#view-cutout').classList.contains('active')) return;
-  const mk = (list, sel, on) => { const c = document.createElement('div'); list.forEach(a => { const b = document.createElement('button'); b.className = 'th'; b.setAttribute('aria-pressed', a.id === sel); const im = new Image(); im.src = a.url; im.alt = a.name; b.appendChild(im); if (!a.builtin) { const x = document.createElement('button'); x.className = 'del'; x.textContent = '✕'; x.title = 'Delete'; x.onclick = async e => { e.stopPropagation(); if (confirm('Delete this image?')) { await store.deleteAsset(a.id); renderCutoutView(); refreshAssetSelects(); } }; b.appendChild(x); } b.onclick = () => on(a.id); c.appendChild(b); }); return [...c.children]; };
+  const mk = (list, sel, on) => { const c = document.createElement('div'); list.forEach(a => { const b = document.createElement('button'); b.className = 'th'; b.setAttribute('aria-pressed', a.id === sel); const im = new Image(); im.src = a.url; im.alt = a.name; b.appendChild(im); if (!a.builtin && !a.shared) { const x = document.createElement('button'); x.className = 'del'; x.textContent = '✕'; x.title = 'Delete'; x.onclick = async e => { e.stopPropagation(); if (confirm('Delete this image?')) { await store.deleteAsset(a.id); renderCutoutView(); refreshAssetSelects(); } }; b.appendChild(x); } b.onclick = () => on(a.id); c.appendChild(b); }); return [...c.children]; };
   const pt = $('#photoThumbs'); pt.innerHTML = ''; mk([...assetsOf('photo'), ...assetsOf('bg')], cut.photo, id => { cut.photo = id; cut.candidate = null; $('#btnKeepCutout').disabled = true; renderCutoutView(); }).forEach(el => pt.appendChild(el));
   const ct = $('#cutThumbs'); ct.innerHTML = ''; mk(assetsOf('cutout'), cut.cutout, id => { cut.cutout = id; cut.candidate = null; $('#btnKeepCutout').disabled = true; renderCutoutView(); }).forEach(el => ct.appendChild(el));
   const bgBtn = (b, parent, key) => { const btn = document.createElement('button'); btn.className = 'bg'; btn.setAttribute('aria-pressed', cut.bg && JSON.stringify(cut.bg) === JSON.stringify(b)); btn.appendChild(thumbCanvas(bgDocFrom(b), 68 * 2)); btn.onclick = () => { cut.bg = b; renderCutoutView(); }; parent.appendChild(btn); };
@@ -2432,6 +2564,7 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   }
   setStatus('saved in this browser', 'ok');
   getImg('photo'); getImg('cutout');
+  loadShared();   // not awaited: the studio opens on the cached listing and fills in when the server answers
   // a first visit, or a link ending #grid, opens straight on the profile
   if (seeded || todo || location.hash === '#grid') switchView('grid');
   if (todo) { // the statics sit above the queue, so bring the first cover still to do into view

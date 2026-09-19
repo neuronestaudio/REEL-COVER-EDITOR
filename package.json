@@ -1,0 +1,9 @@
+{
+  "name": "reel-cover-editor",
+  "private": true,
+  "type": "module",
+  "description": "Reel Cover Studio. The site itself is static; the only dependency serves api/photos.js, the shared photo library.",
+  "dependencies": {
+    "@vercel/blob": "^2.8.0"
+  }
+}

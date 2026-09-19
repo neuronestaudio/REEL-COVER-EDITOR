@@ -19,6 +19,20 @@ same grips resize logos, rules and the subject cutout, staying inside the limits
 A thin element keeps only the bottom-right grip, so there is still something left to grab when
 moving it.
 
+**Gradient fill** — a text layer, or just the words selected in its box, can take a gradient
+instead of a flat colour: twelve presets, two or three colours, an angle, and a sweep that runs
+once per line (which reads as foil) or once across the whole block. On selected words it is
+stored on the same ranges part colour uses, so it follows the words through edits and wraps.
+Picking a flat Colour switches a layer's gradient back off.
+
+**Shared photos** — "Upload for everyone" in the photo library (or the arrow on one of your own
+photos) sends a photo to the server, and every browser that opens the studio then lists it under
+**Shared**. It needs the team upload key once per device. `api/photos.js` is the whole back end:
+it keeps the files in the Vercel Blob store connected to the project (`BLOB_READ_WRITE_TOKEN`)
+and checks the key (`STUDIO_UPLOAD_KEY`) on anything that writes. Photos are shrunk to 2400 px
+JPEG in the browser first. Covers still live only in the browser that made them. Run
+`npx vercel dev` rather than a plain static server to have the shared library locally.
+
 **Part colour** — select any words inside a caption and give just those a different colour, so
 one heading can carry an accent without being split into separate layers. Select in the text
 box, then pick from **Part colour**; **Clear** returns the selection to the layer colour, or
