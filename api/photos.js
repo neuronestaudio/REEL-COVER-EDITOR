@@ -61,9 +61,10 @@ export async function GET() {
       by.set(m[1], e);
     }
     const photos = [...by.values()].filter(e => e.url).sort((a, b) => a.at - b.at);
-    // A minute at the edge keeps a busy day from turning into thousands of list calls;
-    // the person who just uploaded asks with a fresh query string and skips the cache.
-    return json({ photos, max: MAX_PHOTOS }, 200, { 'cache-control': 'public, max-age=0, s-maxage=60, stale-while-revalidate=300' });
+    // Listing is a metered call, so the edge holds the answer for two minutes and browsers
+    // keep theirs for ten; whoever just uploaded, or pressed refresh, asks with a fresh
+    // query string and skips both.
+    return json({ photos, max: MAX_PHOTOS }, 200, { 'cache-control': 'public, max-age=0, s-maxage=120, stale-while-revalidate=600' });
   } catch (err) {
     console.error(err); return json({ error: 'The shared library could not be read.' }, 500);
   }

@@ -934,16 +934,25 @@ const SHARE_API = 'api/photos';
 function sharedCacheSave() { try { localStorage.setItem('rcs.sharedCache', JSON.stringify(Object.values(SHARED).map(a => ({ id: a.sid, name: a.name, url: a.url, thumb: a.thumb, at: a.at })))); } catch {} }
 function sharedBust() { try { localStorage.setItem('rcs.sharedBust', String(Date.now())); } catch {} }
 function sharedRefreshUI() { if (!doc) return; refreshAssetSelects(); renderBgPick(); renderPool(); renderAll(); }
-async function loadShared() {
-  // Someone who has just uploaded or removed a photo skips the edge cache for a while.
-  let q = ''; try { const t = +localStorage.getItem('rcs.sharedBust'); if (t && Date.now() - t < 15 * 60e3) q = '?t=' + t; } catch {}
+async function loadShared(force) {
+  /* Listing the store is a metered call, so a browser reuses the listing it has for ten
+     minutes. Someone who has just uploaded or removed a photo asks past the edge cache
+     (the query is the same until their next change, so even that is cached after one
+     call), and the refresh button always asks afresh. */
+  let q = '', at = 0;
+  try {
+    at = +localStorage.getItem('rcs.sharedAt') || 0;
+    const t = +localStorage.getItem('rcs.sharedBust');
+    if (force) q = '?t=' + Date.now(); else if (t && Date.now() - t < 15 * 60e3) q = '?t=' + t;
+  } catch {}
+  if (!force && !q && Date.now() - at < 10 * 60e3) { share.ok = true; return sharedRefreshUI(); }
   try {
     const r = await fetch(SHARE_API + q, { headers: { accept: 'application/json' } });
     if (!r.ok || !/json/.test(r.headers.get('content-type') || '')) throw new Error('no shared library here');
     const data = await r.json(); share.ok = true; share.max = data.max || share.max;
     for (const k of Object.keys(SHARED)) { delete assets[k]; delete SHARED[k]; }
     for (const p of data.photos || []) { const a = sharedAsset(p); SHARED[a.id] = a; assets[a.id] = a; }
-    sharedCacheSave();
+    sharedCacheSave(); try { localStorage.setItem('rcs.sharedAt', String(Date.now())); } catch {}
   } catch (e) { share.ok = false; }
   sharedRefreshUI();
 }
@@ -1031,6 +1040,7 @@ function localShareBtn(b, a) {
   b.appendChild(u);
 }
 $('#bgLibShare').onclick = () => $('#shareInput').click();
+$('#bgLibShareRefresh').onclick = async () => { await loadShared(true); toast(share.ok ? 'Shared photos are up to date' : 'The shared library could not be reached'); };
 $('#shareInput').addEventListener('change', e => {
   const files = [...e.target.files].filter(f => f.type.startsWith('image/')).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   e.target.value = '';
