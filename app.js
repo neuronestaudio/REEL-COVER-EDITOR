@@ -2589,7 +2589,8 @@ async function seedReelSet() {
 const POST_SET = 'wa-20-v1';
 const PC = { navy: '#18202b', deep: '#131b29', paper: '#f2ece0', ink: '#0c111b', red: '#b5432f', dim: '#bbc0c9', slate: '#5c6470', faint: '#cdd2da' };
 const POST_STYLES = ['hook', 'practice', 'event'];
-const POST_STYLE_NAME = { hook: 'The hook', practice: 'The practice', event: 'The event' };
+const POST_STYLE_NAME_EXTRA = { photo: 'Photo' };
+const POST_STYLE_NAME = { hook: 'Type', practice: 'Ivory card', event: 'The event', photo: 'Photo' };
 const postGround = s => s === 'practice' ? PC.paper : s === 'event' ? PC.deep : PC.navy;
 const postFooter = (i, n) => `${String(i).padStart(2, '0')} / ${String(n).padStart(2, '0')}`;
 const waPosts = () => window.__WA_POSTS__ || {};
@@ -2608,18 +2609,30 @@ function postHeadSize(t, style) {
    instead of landing on it, and the slide number sits on the floor of the card. */
 function postLayers(style, o) {
   return withSize(POST, () => {
-    const paper = style === 'practice', pad = 0.08 * W, x = 0.08, width = 0.84;
-    const ink = paper ? PC.ink : PC.paper, quiet = paper ? PC.slate : PC.dim;
+    const paper = style === 'practice', onPhoto = style === 'photo';
+    const pad = 0.08 * W, x = 0.08, width = 0.84;
+    const ink = paper ? PC.ink : PC.paper, quiet = paper ? PC.slate : onPhoto ? PC.faint : PC.dim;
     const mk = (text, over) => newText({ text, font: 'Manrope', weight: 400, size: 40, track: 0, line: 1.45, align: 'left', x, width, color: quiet, shadow: 0, ...over });
     const L = [];
-    const eyebrow = mk(o.eyebrow || '', { weight: 600, size: 26, track: 0.14, line: 1.5, upper: true, color: paper ? PC.red : PC.faint });
-    const head = mk(o.head || '', { font: 'Fraunces', size: postHeadSize(o.head, style), track: -0.02, line: 1.12, color: ink });
-    let y = pad;
-    eyebrow.y = y / H; y += measureLayer(eyebrow).height + 62; L.push(eyebrow);
-    head.y = y / H; y += measureLayer(head).height + 44; L.push(head);
-    if (o.body) { const body = mk(o.body, { size: style === 'event' ? 37 : 44 }); body.y = y / H; y += measureLayer(body).height; L.push(body); }
-    if (o.cta) L.push(mk(o.cta, { weight: 700, size: 34, track: 0.02, line: 1.3, width: 0.5, color: PC.paper, box: 'block', boxColor: PC.red, boxAlpha: 1, y: (y + 54) / H }));
-    L.push(mk(o.footer || '', { weight: 600, size: 25, track: 0.1, line: 1.4, upper: true, color: paper ? PC.slate : PC.faint, y: (H - pad - 35) / H }));
+    const eyebrow = mk(o.eyebrow || '', { weight: 600, size: 26, track: 0.14, line: 1.5, upper: true, color: paper ? PC.red : PC.faint, shadow: onPhoto ? 0.5 : 0 });
+    const head = mk(o.head || '', { font: 'Fraunces', size: postHeadSize(o.head, style), track: -0.02, line: 1.12, color: ink, shadow: onPhoto ? 0.5 : 0 });
+    const body = o.body ? mk(o.body, { size: style === 'event' ? 37 : onPhoto ? 40 : 44, shadow: onPhoto ? 0.5 : 0 }) : null;
+    const foot = mk(o.footer || '', { weight: 600, size: 25, track: 0.1, line: 1.4, upper: true, color: paper ? PC.slate : PC.faint, shadow: onPhoto ? 0.5 : 0 });
+    foot.y = (H - pad - 35) / H;
+    eyebrow.y = pad / H;
+    if (onPhoto) {
+      /* Over a picture the type sits on the floor of the frame, where the scrim
+         is darkest, and is stacked upwards so the headline always clears it. */
+      let y = H - pad - 78;
+      if (body) { y -= measureLayer(body).height; body.y = y / H; y -= 40; }
+      y -= measureLayer(head).height; head.y = y / H;
+    } else {
+      let y = pad + measureLayer(eyebrow).height + 62;
+      head.y = y / H; y += measureLayer(head).height + 44;
+      if (body) { body.y = y / H; y += measureLayer(body).height; }
+      if (o.cta) L.push(mk(o.cta, { weight: 700, size: 34, track: 0.02, line: 1.3, width: 0.5, color: PC.paper, box: 'block', boxColor: PC.red, boxAlpha: 1, y: (y + 54) / H }));
+    }
+    L.push(eyebrow, head); if (body) L.push(body); L.push(foot);
     return L;
   });
 }
@@ -2629,17 +2642,22 @@ function postDoc(meta, i, of, slide, style) {
   style = style || POST_STYLES[Math.min(i, POST_STYLES.length - 1)];
   const d = baseDoc(`${String(meta.n || 0).padStart(2, '0')}.${i + 1} · ${meta.title}`);
   d.w = POST.w; d.h = POST.h;
-  d.bg = { ...d.bg, type: 'solid', color: postGround(style) };
   d.subject = { ...d.subject, on: false };
-  d.overlay = { ...d.overlay, type: 'none', opacity: 0 };
   d.grain = 0;
+  if (style === 'photo' && slide.photo) {   // shared-library photo, with a scrim for the type
+    d.bg = { ...d.bg, type: 'image', image: 'sh_' + slide.photo, fit: 'fill', scale: 1, x: 0, y: 0, blur: 0, bright: 1, sat: 1 };
+    d.overlay = { ...d.overlay, type: 'both', color: '#0a0e16', opacity: 0.95 };
+  } else {
+    d.bg = { ...d.bg, type: 'solid', color: postGround(style) };
+    d.overlay = { ...d.overlay, type: 'none', opacity: 0 };
+  }
   d.layers = postLayers(style, {
     eyebrow: slide.eyebrow || (waPosts().eyebrow || {})[style] || '',
     head: slide.head || '', body: slide.body || '', cta: slide.cta || '', footer: postFooter(i + 1, of),
   });
   d.post = {
     set: POST_SET, key: `${meta.cid}:${i + 1}`, cid: meta.cid, n: meta.n || 0, slide: i + 1, of, style,
-    title: meta.title || 'Carousel', category: meta.category || '', insight: meta.insight || '', pick: meta.pick || '', visual: slide.visual || '',
+    title: meta.title || 'Carousel', category: meta.category || '', insight: meta.insight || '', pick: meta.pick || '', visual: slide.visual || '', photo: slide.photo || '',
   };
   return d;
 }
@@ -2667,13 +2685,45 @@ async function seedPostSet() {
   return recs.length > 0;
 }
 
+/* The four sets written to be posted in the run-up to Saturday (wa-sets.js).
+   They are seeded like the storyboards but under their own gate, and grouped by
+   the angle "Ready to post" so the chip in the Posts tab filters to exactly the
+   run that is going out. Their photographs come from the shared library, so
+   nothing large is committed to the repo. */
+const WA_LIVE = 'wa-live-1';
+async function seedWaSets() {
+  const wa = window.__WA_SETS__; if (!wa || !wa.sets) return false;
+  setStatus('loading the live sets…');
+  await loadPostFonts();
+  const have = new Set(covers.filter(c => c.doc && c.doc.post).map(c => c.doc.post.key));
+  let t = Math.min(Date.now(), ...covers.map(c => c.createdAt || Date.now())) - 18e5;
+  const recs = [];
+  for (const s of wa.sets) {
+    const meta = { n: s.n, cid: s.cid, title: s.title, category: 'Ready to post', insight: s.insight, pick: s.pick };
+    s.slides.forEach((sl, i) => {
+      if (have.has(`${s.cid}:${i + 1}`)) return;
+      const slide = {
+        head: sl.head, body: sl.style === 'event' ? wa.event : sl.body,
+        cta: sl.style === 'event' ? wa.cta : '', photo: sl.photo,
+        eyebrow: (wa.eyebrow || {})[sl.style] || '', visual: sl.note || '',
+      };
+      const d = postDoc(meta, i, s.slides.length, slide, sl.style);
+      d.post.emotion = s.emotion || ''; d.post.caption = s.caption || '';
+      d.createdAt = d.updatedAt = t++; recs.push(coverRecord(d));
+    });
+  }
+  if (recs.length) { await store.saveCovers(recs); covers = covers.concat(recs); }
+  settings.waLive = WA_LIVE; await store.saveSettings(settings).catch(() => {});
+  return recs.length > 0;
+}
+
 /* ---------------- the posts view ---------------- */
 function postGroups() {
   const by = new Map();
   for (const c of covers) {
     const p = c.doc && c.doc.post; if (!p) continue;
     let g = by.get(p.cid);
-    if (!g) by.set(p.cid, g = { cid: p.cid, n: p.n || 0, title: p.title || 'Carousel', category: p.category || '', insight: p.insight || '', pick: p.pick || '', slides: [] });
+    if (!g) by.set(p.cid, g = { cid: p.cid, n: p.n || 0, title: p.title || 'Carousel', category: p.category || '', insight: p.insight || '', pick: p.pick || '', emotion: p.emotion || '', caption: p.caption || '', slides: [] });
     g.slides.push(c);
   }
   for (const g of by.values()) g.slides.sort((x, y) => (x.doc.post.slide || 0) - (y.doc.post.slide || 0));
@@ -2705,12 +2755,15 @@ function postCard(g) {
   const el = document.createElement('article'); el.className = 'pcard'; el.dataset.pick = !!g.pick; el.dataset.cid = g.cid;
   const head = document.createElement('header'), meta = document.createElement('div');
   meta.innerHTML = `<span class="kicker">${String(g.n || 0).padStart(2, '0')}${g.category ? ' · ' + escapeHtml(g.category) : ''}</span>`
-    + `<h3>${escapeHtml(g.title)}${g.pick ? '<em>TOP PICK</em>' : ''}</h3>`
+    + `<h3>${escapeHtml(g.title)}${g.emotion ? `<em>${escapeHtml(g.emotion.toUpperCase())}</em>` : g.pick ? '<em>TOP PICK</em>' : ''}</h3>`
     + (g.insight ? `<p class="insight">${escapeHtml(g.insight)}</p>` : '')
     + (g.pick ? `<p class="why">Why shortlist: ${escapeHtml(g.pick)}</p>` : '');
   const acts = document.createElement('div'); acts.className = 'acts';
-  acts.innerHTML = '<button class="small">Export carousel</button><button class="small ghost">Duplicate</button><button class="small ghost">Delete</button>';
-  const [exp, dup, del] = $$('button', acts);
+  acts.innerHTML = (g.caption ? '<button class="small ghost">Copy caption</button>' : '')
+    + '<button class="small">Export carousel</button><button class="small ghost">Duplicate</button><button class="small ghost">Delete</button>';
+  const btns = $$('button', acts);
+  if (g.caption) { const cap = btns.shift(); cap.onclick = () => { navigator.clipboard.writeText(g.caption).then(() => toast('Caption copied'), () => toast('Could not copy')); }; }
+  const [exp, dup, del] = btns;
   exp.onclick = () => exportCarousel(g); dup.onclick = () => duplicateCarousel(g); del.onclick = () => deleteCarousel(g);
   head.append(meta, acts); el.appendChild(head);
   const row = document.createElement('div'); row.className = 'pslides';
@@ -2733,10 +2786,14 @@ function postSlideTile(r) {
   el.append(b, cap); return el;
 }
 const carouselFile = g => `${String(g.n || 0).padStart(2, '0')}-${slug(g.title)}`;
+const slideDocs = g => g.slides.map(r => r.id === doc?.id ? doc : r.doc);
+/* A background that has not been decoded yet renders as an empty frame, so every
+   picture in the carousel is waited for before a single slide is rendered. */
+const awaitSlidePhotos = docs => preloadAssets(docs.map(d => d.bg && d.bg.type === 'image' ? d.bg.image : null));
 async function exportCarousel(g) {
   if (!g.slides.length) return;
   setStatus('rendering…'); toast(`Rendering ${g.slides.length} slides…`);
-  await loadPostFonts();
+  await loadPostFonts(); await awaitSlidePhotos(slideDocs(g));
   const zip = new JSZip();
   for (const r of g.slides) {
     const d = r.id === doc?.id ? doc : r.doc;
@@ -2750,6 +2807,7 @@ async function exportAllCarousels() {
   const n = all.reduce((k, g) => k + g.slides.length, 0);
   setStatus('rendering…'); toast(`Rendering ${n} slides…`);
   await loadPostFonts();
+  for (const g of all) await awaitSlidePhotos(slideDocs(g));
   const zip = new JSZip();
   for (const g of all) for (const r of g.slides) {
     const d = r.id === doc?.id ? doc : r.doc;
@@ -2857,7 +2915,8 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   }
   setStatus('saved in this browser', 'ok');
   getImg('photo'); getImg('cutout');
-  loadShared();   // not awaited: the studio opens on the cached listing and fills in when the server answers
+  await loadShared();   // the live sets use shared photographs, so they have to be listed first
+  if (settings.waLive !== WA_LIVE) { try { await seedWaSets(); } catch (e) { console.warn('live sets', e); } }
   // a first visit, or a link ending #grid, opens straight on the profile
   if (seeded || todo || location.hash === '#grid') switchView('grid');
   if (location.hash === '#posts') switchView('posts');   // a link straight to the carousels
