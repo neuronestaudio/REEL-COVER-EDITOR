@@ -1,7 +1,20 @@
 /* Reel Cover Studio — single-page editor, grid preview, cutout & backgrounds */
 (() => {
 'use strict';
-const W = 1080, H = 1920;
+/* The size of the document being drawn. A reel cover is 1080×1920; a carousel
+   post is 1080×1350. A document with no w/h is a cover, so nothing had to be
+   migrated. Anything that draws or measures runs inside withSize, which sets
+   these for the document in hand and puts back what was there, so between
+   renders they always describe the document on the stage — which is what the
+   pointer and zoom maths read. */
+let W = 1080, H = 1920;
+const COVER = { w: 1080, h: 1920 }, POST = { w: 1080, h: 1350 };
+const sizeOf = d => ({ w: (d && d.w) || 1080, h: (d && d.h) || 1920 });
+const isPost = d => !!(d && d.post);
+function withSize(d, fn) {
+  const pw = W, ph = H, s = sizeOf(d); W = s.w; H = s.h;
+  try { return fn(); } finally { W = pw; H = ph; }
+}
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
@@ -429,7 +442,8 @@ function drawLogo(x, l) {
   else { x.strokeStyle = 'rgba(255,255,255,.5)'; x.setLineDash([12, 10]); x.lineWidth = 3; x.strokeRect(X, Y, w, h); x.font = '500 28px "JetBrains Mono"'; x.fillStyle = '#fff'; x.textAlign = 'center'; x.fillText('LOGO', X + w / 2, Y + h / 2 + 10); }
   x.restore(); return { x: X, y: Y, w, h };
 }
-function render(ctx, doc, scale, boxes, ui) {
+function render(ctx, d, scale, boxes, ui) { return withSize(d, () => drawDoc(ctx, d, scale, boxes, ui)); }
+function drawDoc(ctx, doc, scale, boxes, ui) {
   ctx.save(); ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.clearRect(0, 0, W, H);
   drawBackground(ctx, doc);
@@ -441,10 +455,12 @@ function render(ctx, doc, scale, boxes, ui) {
   ctx.restore();
 }
 function renderTo(canvas, doc, cssW) {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2); const s = cssW / W;
-  const pw = Math.round(cssW * dpr), ph = Math.round(cssW * H / W * dpr);
-  if (canvas.width !== pw) { canvas.width = pw; canvas.height = ph; }
-  render(canvas.getContext('2d'), doc, s * dpr, null);
+  withSize(doc, () => {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2); const s = cssW / W;
+    const pw = Math.round(cssW * dpr), ph = Math.round(cssW * H / W * dpr);
+    if (canvas.width !== pw) { canvas.width = pw; canvas.height = ph; }
+    render(canvas.getContext('2d'), doc, s * dpr, null);
+  });
 }
 function requestFonts(doc) { doc.layers.forEach(l => { if (l.type === 'text') ensureFont(l.font, l.weight, l.italic); }); }
 
@@ -614,6 +630,7 @@ async function persistCurrent(withVersion) {
   try { await store.saveCover(rec); setStatus('saved · this browser', 'ok'); }
   catch (e) { console.warn(e); setStatus('save failed', 'warn'); }
   renderCoverList(); renderVersions(); renderGrid();
+  if ($('#view-posts').classList.contains('active')) renderPosts();
 }
 
 /* ---------------- editor UI ---------------- */
@@ -627,6 +644,7 @@ function stageZoom() {
    accessor is filled in by the part-colour code further down. */
 let uiHi = () => null;
 function renderPreview() {
+  const sz = sizeOf(doc); W = sz.w; H = sz.h;   // the stage, and everything that hit-tests it, follows the open document
   const z = stageZoom(), cssW = Math.round(W * z), cssH = Math.round(H * z);
   preview.style.width = cssW + 'px'; preview.style.height = cssH + 'px';
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -1396,10 +1414,21 @@ function focusPropPanel() {
 function syncPropsLite() { ['subjX', 'subjY'].forEach(id => $('#' + id)._sync()); }
 function syncAll() {
   $('#docName').value = doc.name;
+  syncFrame();
   $('#bgImageCtl').hidden = doc.bg.type !== 'image'; $('#bgSolidCtl').hidden = doc.bg.type !== 'solid'; $('#bgGradCtl').hidden = doc.bg.type !== 'gradient'; $('#bgTexCtl').hidden = doc.bg.type !== 'texture';
   $('#subjCtl').style.opacity = doc.subject.on ? 1 : .45;
   refreshAssetSelects(); renderBgPick(); $('#subjImage').value = doc.subject.image;
   renderLayers(); syncProps();
+}
+/* Guides and the export menu describe whichever frame is open. */
+function syncFrame() {
+  const post = isPost(doc);
+  $('#guides').setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const guide = (el, show) => show ? el.removeAttribute('hidden') : el.setAttribute('hidden', '');
+  guide($('#guidesPost'), post); guide($('#guidesCover'), !post);
+  $('#frameLbl').textContent = `${W} × ${H}`;
+  const o = $$('#exportScale option');
+  o[0].textContent = `${W}×${H} PNG`; o[1].textContent = `${W * 2}×${H * 2} PNG`; o[2].textContent = `${W}×${H} JPG`;
 }
 function refreshAssetSelects() {
   if ($('#mosImage')?._fill) $('#mosImage')._fill();
@@ -1413,7 +1442,7 @@ function pickFiles(cb, accept = 'image/*') { const fi = $('#fileInput'); fi.acce
 function pickFile(cb, accept = 'image/*') { const fi = $('#fileInput'); fi.accept = accept; fi.multiple = false; fi.value = ''; fi.onchange = () => { if (fi.files[0]) cb(fi.files[0]); }; fi.click(); }
 
 /* ---------------- covers library ---------------- */
-function loadDoc(d) { clearTimeout(saveTimer); doc = JSON.parse(JSON.stringify(d)); sel = null; undoStack = []; redoStack = []; updateUndoBtns(); syncAll(); renderAll(); renderCoverList(); renderVersions(); setStatus('saved · this browser', 'ok'); }
+function loadDoc(d) { clearTimeout(saveTimer); doc = JSON.parse(JSON.stringify(d)); const sz = sizeOf(doc); W = sz.w; H = sz.h; sel = null; undoStack = []; redoStack = []; updateUndoBtns(); syncAll(); renderAll(); renderCoverList(); renderVersions(); setStatus('saved · this browser', 'ok'); }
 function thumbCanvas(d, cssW) { const c = document.createElement('canvas'); renderTo(c, d, cssW); return c; }
 /* With 80+ covers, drawing every thumbnail up front locks the page for seconds.
    Tiles paint as they come into view instead. */
@@ -1427,19 +1456,33 @@ async function lazyDraw(c) {
 }
 function lazyCanvas(d, cssW) {
   const c = document.createElement('canvas');
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  c.width = Math.round(cssW * dpr); c.height = Math.round(cssW * H / W * dpr);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), sz = sizeOf(d);
+  c.width = Math.round(cssW * dpr); c.height = Math.round(cssW * sz.h / sz.w * dpr);
   c._doc = d; c._w = cssW;
   if (lazyIO) lazyIO.observe(c); else lazyDraw(c);
   return c;
 }
+/* The rail lists covers, or — while a carousel slide is open — that carousel's
+   slides in posting order, so one can be edited after another without leaving
+   the editor. Posts never appear in the cover list, or in the profile grid. */
 function renderCoverList() {
   const c = $('#coverList'); c.innerHTML = '';
-  const list = [...covers].sort((a, b) => b.updatedAt - a.updatedAt);
+  const inPost = isPost(doc);
+  const list = inPost
+    ? covers.filter(r => r.doc?.post?.cid === doc.post.cid).sort((a, b) => (a.doc.post.slide || 0) - (b.doc.post.slide || 0))
+    : covers.filter(r => !isPost(r.doc)).sort((a, b) => b.updatedAt - a.updatedAt);
+  $('#coverListTitle').textContent = inPost ? `Slides · ${doc.post.title || 'carousel'}` : 'Covers';
+  if (inPost) {
+    const back = document.createElement('button'); back.className = 'small ghost'; back.style.cssText = 'width:100%;margin-bottom:6px';
+    back.textContent = '← Back to the covers';
+    back.onclick = () => { const r = [...covers].filter(x => !isPost(x.doc)).sort((a, b) => b.updatedAt - a.updatedAt)[0]; if (r) loadDoc(r.doc); };
+    c.appendChild(back);
+  }
   if (!list.length) c.innerHTML = '<div class="empty">No covers yet.</div>';
   list.forEach(r => {
     const d = document.createElement('div'); d.className = 'cover-item'; d.setAttribute('aria-current', r.id === doc?.id); d.dataset.id = r.id; d.classList.toggle('picked', picked.has(r.id));
-    const th = lazyCanvas(r.id === doc?.id ? doc : r.doc, 38 * 2); th.style.width = '38px'; th.style.height = '68px';
+    const rs = sizeOf(r.doc);
+    const th = lazyCanvas(r.id === doc?.id ? doc : r.doc, 38 * 2); th.style.width = '38px'; th.style.height = Math.round(38 * rs.h / rs.w) + 'px';
     d.appendChild(th);
     const info = document.createElement('div'); info.innerHTML = `<div class="nm">${escapeHtml(r.name)}</div><div class="meta">${fmtTime(r.updatedAt)} · ${(r.versions || []).length} ver</div>`; d.appendChild(info);
     const acts = document.createElement('div'); acts.innerHTML = `<input type="checkbox" class="pick" title="Select for export"><button class="icon small ghost" title="Duplicate">⧉</button><button class="icon small ghost" title="Delete">✕</button>`;
@@ -1483,7 +1526,7 @@ function renderTemplates() {
 /* ---------------- export ---------------- */
 async function renderBlob(d, scale, type = 'png') {
   await Promise.allSettled([...fontReq].map(k => document.fonts.load(k)));
-  const c = document.createElement('canvas'); c.width = W * scale; c.height = H * scale; render(c.getContext('2d'), d, scale, null);
+  const sz = sizeOf(d), c = document.createElement('canvas'); c.width = sz.w * scale; c.height = sz.h * scale; render(c.getContext('2d'), d, scale, null);
   return new Promise(res => c.toBlob(res, type === 'jpg' ? 'image/jpeg' : 'image/png', 0.94));
 }
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'cover';
@@ -1500,7 +1543,7 @@ $('#btnExportAll').onclick = async () => {
 };
 
 /* ---------------- grid view ---------------- */
-function gridOrdered() { const inGrid = (settings.gridOrder || []).map(id => covers.find(c => c.id === id)).filter(Boolean); const rest = covers.filter(c => !settings.gridOrder?.includes(c.id)).sort((a, b) => b.updatedAt - a.updatedAt); return [...inGrid, ...rest]; }
+function gridOrdered() { const inGrid = (settings.gridOrder || []).map(id => covers.find(c => c.id === id)).filter(Boolean); const rest = covers.filter(c => !isPost(c.doc) && !settings.gridOrder?.includes(c.id)).sort((a, b) => b.updatedAt - a.updatedAt); return [...inGrid, ...rest]; }
 let gridDrag = null;
 function renderGrid() {
   if (!$('#view-grid').classList.contains('active')) return;
@@ -1545,7 +1588,7 @@ function renderGrid() {
   }
   const gl = $('#gridList'); gl.innerHTML = ''; $('#gridEmpty').hidden = order.length > 0;
   order.forEach(r => gl.appendChild(gridRow(r, true)));
-  const pool = $('#gridPool'); pool.innerHTML = ''; covers.filter(c => !settings.gridOrder.includes(c.id)).sort((a, b) => b.updatedAt - a.updatedAt).forEach(r => pool.appendChild(gridRow(r, false)));
+  const pool = $('#gridPool'); pool.innerHTML = ''; covers.filter(c => !isPost(c.doc) && !settings.gridOrder.includes(c.id)).sort((a, b) => b.updatedAt - a.updatedAt).forEach(r => pool.appendChild(gridRow(r, false)));
   if (!pool.children.length) pool.innerHTML = '<div class="empty">Every cover is placed.</div>';
 }
 function gridRow(r, inGrid) {
@@ -1579,7 +1622,7 @@ async function exportPicked() {
   const list = gridOrdered().filter(c => picked.has(c.id));
   if (!list.length) return toast('Click covers on the grid, or tick them in the Covers panel, to select them first');
   const scale = +$('#exportScale').value || 1;
-  if (list.length === 1) { const r = list[0], d = r.id === doc?.id ? doc : r.doc; await store.download(`${slug(r.name)}-${W * scale}x${H * scale}.png`, await renderBlob(d, scale)); return toast('Exported'); }
+  if (list.length === 1) { const r = list[0], d = r.id === doc?.id ? doc : r.doc, ds = sizeOf(d); await store.download(`${slug(r.name)}-${ds.w * scale}x${ds.h * scale}.png`, await renderBlob(d, scale)); return toast('Exported'); }
   toast(`Rendering ${list.length} covers…`); const zip = new JSZip();
   for (let i = 0; i < list.length; i++) { const r = list[i]; const d = r.id === doc?.id ? doc : r.doc; zip.file(`${String(i + 1).padStart(2, '0')}-${slug(r.name)}.png`, await renderBlob(d, scale)); }
   const blob = await zip.generateAsync({ type: 'blob' }); await store.download(`reel-covers-selected-${list.length}.zip`, blob); toast(`${list.length} covers exported`);
@@ -1981,7 +2024,7 @@ function buildBatchDoc(c, photoId, o) {
   d.subject = { ...d.subject, on: false };
   d.overlay = { type: 'vignette', color: '#000000', opacity: o.tint };
   d.grain = 0.05;
-  d.layers = c.empty ? [] : coverLayers(c, o);
+  d.layers = c.empty ? [] : withSize(COVER, () => coverLayers(c, o));
   d.batch = { n: c.n, date: c.date, era: c.era, source: c.source, flag: c.flag, empty: c.empty };
   return d;
 }
@@ -2403,7 +2446,7 @@ function buildStaticDoc(s) {
   d.subject = { ...d.subject, on: false };
   d.overlay = { type: 'bottom', color: '#0c0905', opacity: s.layout === 'cover' || s.layout === 'archival' ? 0.35 : 0 };
   d.grain = 0.04;
-  d.layers = staticLayers(s);
+  d.layers = withSize(COVER, () => staticLayers(s));
   d.rts = { id: s.id, set: STATIC_SET, layout: s.layout };
   return d;
 }
@@ -2534,11 +2577,250 @@ async function seedReelSet() {
   return recs.length > 0;
 }
 
+/* ---------------- carousel posts ----------------
+   A carousel post is an ordinary document that happens to be 1080×1350 and to
+   carry doc.post, so every tool in the editor — layers, part colour, gradients,
+   the photo library, undo, versions — works on it with no special case. Slides
+   group into carousels by doc.post.cid. They are kept out of the cover list and
+   the profile grid, because a carousel is a feed post, not a reel cover.
+
+   The twenty storyboards in posts.js are the copy Dion approved; seedPostSet
+   turns each into three slides and never rebuilds one that is already there. */
+const POST_SET = 'wa-20-v1';
+const PC = { navy: '#18202b', deep: '#131b29', paper: '#f2ece0', ink: '#0c111b', red: '#b5432f', dim: '#bbc0c9', slate: '#5c6470', faint: '#cdd2da' };
+const POST_STYLES = ['hook', 'practice', 'event'];
+const POST_STYLE_NAME = { hook: 'The hook', practice: 'The practice', event: 'The event' };
+const postGround = s => s === 'practice' ? PC.paper : s === 'event' ? PC.deep : PC.navy;
+const postFooter = (i, n) => `${String(i).padStart(2, '0')} / ${String(n).padStart(2, '0')}`;
+const waPosts = () => window.__WA_POSTS__ || {};
+/* Layout is measured, so the fonts have to be in before any of it runs. */
+function loadPostFonts() {
+  return Promise.allSettled(['400 100px "Fraunces"', '400 100px "Manrope"', '600 100px "Manrope"', '700 100px "Manrope"'].map(f => document.fonts.load(f)));
+}
+function postHeadSize(t, style) {
+  const n = (t || '').length;
+  if (style === 'event') return n <= 26 ? 84 : n <= 44 ? 72 : 62;
+  return n <= 26 ? 104 : n <= 46 ? 92 : n <= 72 ? 80 : 70;
+}
+/* The three looks from the storyboard: a dark hook, an ivory practice card, and
+   the event card with the details and the button. Blocks stack down from the top
+   margin by their measured height, so a long headline pushes the body down
+   instead of landing on it, and the slide number sits on the floor of the card. */
+function postLayers(style, o) {
+  return withSize(POST, () => {
+    const paper = style === 'practice', pad = 0.08 * W, x = 0.08, width = 0.84;
+    const ink = paper ? PC.ink : PC.paper, quiet = paper ? PC.slate : PC.dim;
+    const mk = (text, over) => newText({ text, font: 'Manrope', weight: 400, size: 40, track: 0, line: 1.45, align: 'left', x, width, color: quiet, shadow: 0, ...over });
+    const L = [];
+    const eyebrow = mk(o.eyebrow || '', { weight: 600, size: 26, track: 0.14, line: 1.5, upper: true, color: paper ? PC.red : PC.faint });
+    const head = mk(o.head || '', { font: 'Fraunces', size: postHeadSize(o.head, style), track: -0.02, line: 1.12, color: ink });
+    let y = pad;
+    eyebrow.y = y / H; y += measureLayer(eyebrow).height + 62; L.push(eyebrow);
+    head.y = y / H; y += measureLayer(head).height + 44; L.push(head);
+    if (o.body) { const body = mk(o.body, { size: style === 'event' ? 37 : 44 }); body.y = y / H; y += measureLayer(body).height; L.push(body); }
+    if (o.cta) L.push(mk(o.cta, { weight: 700, size: 34, track: 0.02, line: 1.3, width: 0.5, color: PC.paper, box: 'block', boxColor: PC.red, boxAlpha: 1, y: (y + 54) / H }));
+    L.push(mk(o.footer || '', { weight: 600, size: 25, track: 0.1, line: 1.4, upper: true, color: paper ? PC.slate : PC.faint, y: (H - pad - 35) / H }));
+    return L;
+  });
+}
+/* meta: the carousel (n, cid, title, angle, insight, shortlist).
+   slide: the copy for this one (head, body, cta, eyebrow, visual). */
+function postDoc(meta, i, of, slide, style) {
+  style = style || POST_STYLES[Math.min(i, POST_STYLES.length - 1)];
+  const d = baseDoc(`${String(meta.n || 0).padStart(2, '0')}.${i + 1} · ${meta.title}`);
+  d.w = POST.w; d.h = POST.h;
+  d.bg = { ...d.bg, type: 'solid', color: postGround(style) };
+  d.subject = { ...d.subject, on: false };
+  d.overlay = { ...d.overlay, type: 'none', opacity: 0 };
+  d.grain = 0;
+  d.layers = postLayers(style, {
+    eyebrow: slide.eyebrow || (waPosts().eyebrow || {})[style] || '',
+    head: slide.head || '', body: slide.body || '', cta: slide.cta || '', footer: postFooter(i + 1, of),
+  });
+  d.post = {
+    set: POST_SET, key: `${meta.cid}:${i + 1}`, cid: meta.cid, n: meta.n || 0, slide: i + 1, of, style,
+    title: meta.title || 'Carousel', category: meta.category || '', insight: meta.insight || '', pick: meta.pick || '', visual: slide.visual || '',
+  };
+  return d;
+}
+async function seedPostSet() {
+  const wa = waPosts(); if (!wa.ideas || !wa.ideas.length) return false;
+  setStatus('loading the carousel storyboards…');
+  await loadPostFonts();
+  const have = new Set(covers.filter(c => c.doc && c.doc.post).map(c => c.doc.post.key));
+  // stamped older than the covers, so the studio still opens on the latest cover
+  let t = Math.min(Date.now(), ...covers.map(c => c.createdAt || Date.now())) - 36e5;
+  const recs = [];
+  for (const idea of wa.ideas) {
+    const meta = { n: idea.n, cid: `wa-${idea.n}`, title: idea.title, category: idea.category, insight: idea.insight, pick: idea.pick };
+    idea.slides.forEach((s, i) => {
+      if (have.has(`${meta.cid}:${i + 1}`)) return;         // an edited slide is never rebuilt
+      const style = POST_STYLES[Math.min(i, POST_STYLES.length - 1)];
+      const d = postDoc(meta, i, idea.slides.length, {
+        head: s.head, body: style === 'event' ? wa.event : s.body, cta: style === 'event' ? wa.cta : '', visual: s.visual,
+      }, style);
+      d.createdAt = d.updatedAt = t++; recs.push(coverRecord(d));
+    });
+  }
+  if (recs.length) { await store.saveCovers(recs); covers = covers.concat(recs); }
+  settings.postSet = POST_SET; await store.saveSettings(settings).catch(() => {});
+  return recs.length > 0;
+}
+
+/* ---------------- the posts view ---------------- */
+function postGroups() {
+  const by = new Map();
+  for (const c of covers) {
+    const p = c.doc && c.doc.post; if (!p) continue;
+    let g = by.get(p.cid);
+    if (!g) by.set(p.cid, g = { cid: p.cid, n: p.n || 0, title: p.title || 'Carousel', category: p.category || '', insight: p.insight || '', pick: p.pick || '', slides: [] });
+    g.slides.push(c);
+  }
+  for (const g of by.values()) g.slides.sort((x, y) => (x.doc.post.slide || 0) - (y.doc.post.slide || 0));
+  return [...by.values()].sort((x, y) => (x.n - y.n) || String(x.cid).localeCompare(y.cid));
+}
+let postFilter = 'all';
+function renderPosts() {
+  const wrap = $('#postList'); if (!wrap) return;
+  wrap.innerHTML = '';
+  const all = postGroups();
+  $('#postEmpty').hidden = all.length > 0;
+  const counts = new Map(); all.forEach(g => { if (g.category) counts.set(g.category, (counts.get(g.category) || 0) + 1); });
+  const picks = all.filter(g => g.pick).length;
+  const chips = [['all', 'All carousels', all.length]]
+    .concat(picks ? [['top', 'Top picks', picks]] : [])
+    .concat([...counts.keys()].sort().map(k => [k, k, counts.get(k)]));
+  if (!chips.some(c => c[0] === postFilter)) postFilter = 'all';
+  const cc = $('#postChips'); cc.innerHTML = '';
+  chips.forEach(([v, label, n]) => {
+    const b = document.createElement('button'); b.className = 'chip'; b.type = 'button';
+    b.setAttribute('aria-pressed', v === postFilter); b.innerHTML = `${escapeHtml(label)}<i>${n}</i>`;
+    b.onclick = () => { postFilter = v; renderPosts(); };
+    cc.appendChild(b);
+  });
+  all.filter(g => postFilter === 'all' || (postFilter === 'top' ? !!g.pick : g.category === postFilter))
+    .forEach(g => wrap.appendChild(postCard(g)));
+}
+function postCard(g) {
+  const el = document.createElement('article'); el.className = 'pcard'; el.dataset.pick = !!g.pick; el.dataset.cid = g.cid;
+  const head = document.createElement('header'), meta = document.createElement('div');
+  meta.innerHTML = `<span class="kicker">${String(g.n || 0).padStart(2, '0')}${g.category ? ' · ' + escapeHtml(g.category) : ''}</span>`
+    + `<h3>${escapeHtml(g.title)}${g.pick ? '<em>TOP PICK</em>' : ''}</h3>`
+    + (g.insight ? `<p class="insight">${escapeHtml(g.insight)}</p>` : '')
+    + (g.pick ? `<p class="why">Why shortlist: ${escapeHtml(g.pick)}</p>` : '');
+  const acts = document.createElement('div'); acts.className = 'acts';
+  acts.innerHTML = '<button class="small">Export carousel</button><button class="small ghost">Duplicate</button><button class="small ghost">Delete</button>';
+  const [exp, dup, del] = $$('button', acts);
+  exp.onclick = () => exportCarousel(g); dup.onclick = () => duplicateCarousel(g); del.onclick = () => deleteCarousel(g);
+  head.append(meta, acts); el.appendChild(head);
+  const row = document.createElement('div'); row.className = 'pslides';
+  g.slides.forEach(r => row.appendChild(postSlideTile(r)));
+  const add = document.createElement('div'); add.className = 'pslide';
+  add.innerHTML = '<button class="addslide" type="button" title="Add a slide to this carousel">+ Slide</button>';
+  $('button', add).onclick = () => addSlide(g);
+  row.appendChild(add); el.appendChild(row);
+  return el;
+}
+function postSlideTile(r) {
+  const p = r.doc.post, live = r.id === doc?.id ? doc : r.doc;
+  const el = document.createElement('div'); el.className = 'pslide'; el.setAttribute('aria-current', r.id === doc?.id);
+  const b = document.createElement('button'); b.className = 'tile'; b.type = 'button'; b.title = `Open slide ${p.slide} in the editor`;
+  b.appendChild(lazyCanvas(live, 158));
+  const no = document.createElement('span'); no.className = 'no'; no.textContent = String(p.slide).padStart(2, '0'); b.appendChild(no);
+  b.onclick = () => { loadDoc(live); switchView('editor'); };
+  const cap = document.createElement('div'); cap.className = 'cap';
+  cap.innerHTML = `<b>${escapeHtml(POST_STYLE_NAME[p.style] || 'Slide')}</b>${escapeHtml(p.visual || '')}`;
+  el.append(b, cap); return el;
+}
+const carouselFile = g => `${String(g.n || 0).padStart(2, '0')}-${slug(g.title)}`;
+async function exportCarousel(g) {
+  if (!g.slides.length) return;
+  setStatus('rendering…'); toast(`Rendering ${g.slides.length} slides…`);
+  await loadPostFonts();
+  const zip = new JSZip();
+  for (const r of g.slides) {
+    const d = r.id === doc?.id ? doc : r.doc;
+    zip.file(`${String(d.post.slide).padStart(2, '0')}-${slug(g.title)}.png`, await renderBlob(d, 1));
+  }
+  const ok = await store.download(`wa-${carouselFile(g)}.zip`, await zip.generateAsync({ type: 'blob' }));
+  setStatus('saved · this browser', 'ok'); toast(ok ? `${g.slides.length} slides exported` : 'Export cancelled');
+}
+async function exportAllCarousels() {
+  const all = postGroups(); if (!all.length) return toast('No carousels yet');
+  const n = all.reduce((k, g) => k + g.slides.length, 0);
+  setStatus('rendering…'); toast(`Rendering ${n} slides…`);
+  await loadPostFonts();
+  const zip = new JSZip();
+  for (const g of all) for (const r of g.slides) {
+    const d = r.id === doc?.id ? doc : r.doc;
+    zip.file(`${carouselFile(g)}/${String(d.post.slide).padStart(2, '0')}.png`, await renderBlob(d, 1));
+  }
+  const ok = await store.download(`wa-carousels-${new Date().toISOString().slice(0, 10)}.zip`, await zip.generateAsync({ type: 'blob' }));
+  setStatus('saved · this browser', 'ok'); toast(ok ? `${n} slides exported` : 'Export cancelled');
+}
+/* Renumber the slide footers a carousel still carries automatically. A footer
+   somebody has rewritten does not match the pattern, and is left as they wrote it. */
+function renumberSlides(recs) {
+  recs.forEach((r, i) => {
+    const d = r.doc; d.post.slide = i + 1; d.post.of = recs.length;
+    const f = d.layers.find(l => l.type === 'text' && /^\d\d \/ \d\d$/.test(l.text));
+    if (f) { f.text = postFooter(i + 1, recs.length); f.spans = []; }
+    r.updatedAt = d.updatedAt = Date.now();
+  });
+}
+async function addSlide(g) {
+  const i = g.slides.length, style = POST_STYLES[i % POST_STYLES.length], wa = waPosts();
+  const meta = { n: g.n, cid: g.cid, title: g.title, category: g.category, insight: g.insight, pick: g.pick };
+  const d = postDoc(meta, i, i + 1, style === 'event'
+    ? { head: 'Come along.', body: wa.event || '', cta: wa.cta || '' }
+    : { head: 'Your headline here.', body: 'One line underneath it.' }, style);
+  d.post.key = `${g.cid}:x${uid()}`;      // hand-made, so re-seeding can never touch it
+  d.createdAt = d.updatedAt = Date.now();
+  const rec = coverRecord(d), all = g.slides.concat([rec]);
+  renumberSlides(all); covers.push(rec);
+  await store.saveCovers(all);
+  renderPosts(); toast('Slide added');
+}
+async function newCarousel() {
+  const n = Math.max(0, ...postGroups().map(g => g.n || 0)) + 1, wa = waPosts(), now = Date.now();
+  const meta = { n, cid: 'c' + uid(), title: 'New carousel', category: '', insight: '', pick: '' };
+  const slides = [
+    { head: 'Your hook goes here.', body: 'The one line that earns the next slide.' },
+    { head: 'What the practice is.', body: 'What actually happens, in plain words.' },
+    { head: 'Come along.', body: wa.event || '', cta: wa.cta || '' },
+  ];
+  await loadPostFonts();
+  const recs = slides.map((s, i) => { const d = postDoc(meta, i, slides.length, s, POST_STYLES[i]); d.createdAt = d.updatedAt = now + i; return coverRecord(d); });
+  covers = covers.concat(recs); await store.saveCovers(recs);
+  postFilter = 'all'; renderPosts(); toast('Carousel added — open a slide to write it');
+}
+async function duplicateCarousel(g) {
+  const cid = 'c' + uid(), n = Math.max(0, ...postGroups().map(x => x.n || 0)) + 1, now = Date.now();
+  const recs = g.slides.map((r, i) => {
+    const d = JSON.parse(JSON.stringify(r.id === doc?.id ? doc : r.doc));
+    d.id = uid(); d.post = { ...d.post, cid, n, key: `${cid}:${i + 1}`, title: `${g.title} copy` };
+    d.name = `${String(n).padStart(2, '0')}.${i + 1} · ${g.title} copy`;
+    d.createdAt = d.updatedAt = now + i; return coverRecord(d);
+  });
+  covers = covers.concat(recs); await store.saveCovers(recs);
+  renderPosts(); toast('Carousel duplicated');
+}
+async function deleteCarousel(g) {
+  if (!confirm(`Delete “${g.title}” and all ${g.slides.length} of its slides?`)) return;
+  const ids = new Set(g.slides.map(r => r.id));
+  for (const id of ids) await store.deleteCover(id).catch(() => {});
+  covers = covers.filter(c => !ids.has(c.id));
+  if (ids.has(doc?.id)) { const next = covers.find(c => !isPost(c.doc)) || covers[0]; if (next) loadDoc(next.doc); }
+  renderPosts(); renderCoverList(); toast('Carousel deleted');
+}
+$('#btnNewCarousel').onclick = () => newCarousel();
+$('#btnExportCarousels').onclick = () => exportAllCarousels();
+
 /* ---------------- views ---------------- */
 function switchView(v) {
   $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.view === v));
   $$('.view').forEach(s => s.classList.toggle('active', s.id === 'view-' + v));
-  if (v === 'grid') { renderGrid(); renderMosaicPreview(); } if (v === 'cutout') renderCutoutView(); if (v === 'editor') renderAll(); if (v === 'batch') renderBatchView();
+  if (v === 'grid') { renderGrid(); renderMosaicPreview(); } if (v === 'cutout') renderCutoutView(); if (v === 'editor') renderAll(); if (v === 'batch') renderBatchView(); if (v === 'posts') renderPosts();
 }
 $$('nav.tabs button').forEach(b => b.onclick = () => switchView(b.dataset.view));
 document.fonts.addEventListener('loadingdone', () => { renderAll(); renderCoverList(); renderTemplates(); if ($('#view-grid').classList.contains('active')) renderGrid(); });
@@ -2562,6 +2844,7 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   if (settings.demoSet !== DEMO_SET) { try { seeded = await seedDemoSet(); } catch (e) { console.warn('demo set', e); } }
   if (settings.staticSet !== STATIC_SET) { try { await seedStaticSet(); } catch (e) { console.warn('static set', e); } }
   if (settings.mosaicSet !== MOSAIC_SET) { try { await seedMosaicSet(); } catch (e) { console.warn('mosaic set', e); } }
+  if (settings.postSet !== POST_SET) { try { await seedPostSet(); } catch (e) { console.warn('post set', e); } }
   const todo = location.hash === '#todo';
   if (todo && settings.reelSet !== REEL_SET) { try { await seedReelSet(); } catch (e) { console.warn('reel set', e); } }
   if (settings.demoView !== DEMO_VIEW) { settings.shape = '34'; settings.demoView = DEMO_VIEW; store.saveSettings(settings).catch(() => {}); }
@@ -2577,6 +2860,7 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   loadShared();   // not awaited: the studio opens on the cached listing and fills in when the server answers
   // a first visit, or a link ending #grid, opens straight on the profile
   if (seeded || todo || location.hash === '#grid') switchView('grid');
+  if (location.hash === '#posts') switchView('posts');   // a link straight to the carousels
   if (todo) { // the statics sit above the queue, so bring the first cover still to do into view
     const next = (settings.gridOrder || []).find(id => onPlaceholder(covers.find(c => c.id === id)?.doc));
     $$('#igrid .tile').find(t => t.dataset.id === next)?.scrollIntoView({ block: 'center' });

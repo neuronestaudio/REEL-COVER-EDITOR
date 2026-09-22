@@ -119,6 +119,34 @@ aside.right{border-left:1px solid var(--line)}
 .lib__shared span{flex:1;min-width:0}
 .lib__shared b{color:var(--text);font-weight:600}
 .lib__shared button{white-space:nowrap}
+/* Carousel posts: one card per carousel, its slides in posting order. */
+.postwrap{padding:16px 20px 70px;overflow:auto}
+.postbar{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.postbar h2{margin:0;font:600 15px var(--font-ui);letter-spacing:.02em}
+.postbar p{margin:4px 0 0;color:var(--muted);font-size:12px;max-width:74ch;line-height:1.5}
+.postbar .acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.pchips{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px}
+.pchips .chip i{font-style:normal;opacity:.6;margin-left:4px;font-size:10.5px}
+.pcard{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:13px 14px;margin-bottom:11px}
+.pcard[data-pick=true]{border-color:#7c5a2c}
+.pcard header{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.pcard .kicker{font:10px var(--font-mono);letter-spacing:.12em;color:var(--dim);text-transform:uppercase}
+.pcard h3{margin:3px 0 0;font:500 16px var(--font-ui)}
+.pcard h3 em{font:9.5px var(--font-mono);font-style:normal;letter-spacing:.1em;color:var(--accent-ink);background:var(--accent);padding:2px 5px;border-radius:3px;vertical-align:middle;margin-left:7px}
+.pcard .insight{margin:5px 0 0;color:var(--muted);font-size:12px;max-width:80ch}
+.pcard .why{margin:3px 0 0;color:#e3947c;font-size:11.5px;max-width:80ch}
+.pcard header .acts{display:flex;gap:5px;flex-wrap:wrap}
+.pslides{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:flex-start}
+.pslide{width:158px}
+.pslide .tile{display:block;width:100%;padding:0;border-radius:6px;overflow:hidden;border:1px solid var(--line);background:#000;position:relative}
+.pslide .tile canvas{display:block;width:100%;height:auto}
+.pslide .tile:hover{border-color:var(--accent)}
+.pslide[aria-current=true] .tile{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.pslide .tile .no{position:absolute;left:4px;top:4px;font:9px var(--font-mono);letter-spacing:.08em;background:rgba(0,0,0,.6);padding:2px 4px;border-radius:3px;color:#f1ecdf}
+.pslide .cap{margin-top:5px;font-size:10.5px;line-height:1.4;color:var(--dim)}
+.pslide .cap b{display:block;color:var(--muted);font-weight:600;letter-spacing:.06em;font-family:var(--font-mono);font-size:9.5px;text-transform:uppercase;margin-bottom:2px}
+.pslide .addslide{width:100%;min-height:92px;border-style:dashed;color:var(--muted);border-radius:6px}
+#postEmpty{color:var(--muted);font-size:13px;padding:30px 4px}
 /* photo library — a single row until it is opened */
 .lib{border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,var(--raised),var(--panel));overflow:hidden}
 .lib[data-open=true]{border-color:var(--line-2)}
@@ -169,6 +197,7 @@ aside.right{border-left:1px solid var(--line)}
 #selBox::after{content:attr(data-label);position:absolute;left:-1px;top:-18px;font:10px var(--font-mono);background:var(--accent);color:var(--accent-ink);padding:1px 5px;border-radius:2px;letter-spacing:.06em}
 #guides{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:none}
 #guides.on{display:block}
+#guides [hidden]{display:none}
 #stageBar{position:absolute;left:12px;bottom:12px;display:flex;gap:6px;align-items:center;background:rgba(22,21,15,.85);border:1px solid var(--line);padding:5px 8px;border-radius:8px;backdrop-filter:blur(6px)}
 #stageBar .mono{color:var(--muted)}
 #stageBar .mono b{color:var(--text)}
@@ -347,10 +376,11 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
 
 <div id="app">
 <header>
-  <div class="brand"><b>Reel Cover Studio</b><span>1080 × 1920</span></div>
+  <div class="brand"><b>Reel Cover Studio</b><span id="frameLbl">1080 × 1920</span></div>
   <nav class="tabs" role="tablist">
     <button role="tab" aria-selected="true" data-view="editor">Editor</button>
     <button role="tab" aria-selected="false" data-view="grid">Profile grid</button>
+    <button role="tab" aria-selected="false" data-view="posts">Carousel posts</button>
     <button role="tab" aria-selected="false" data-view="cutout">Cutout &amp; backgrounds</button>
     <button role="tab" aria-selected="false" data-view="batch">Batch 72</button>
   </nav>
@@ -371,7 +401,7 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
 <section class="view active" id="view-editor">
   <aside class="left">
     <div class="sec">
-      <h3>Covers <span class="acts"><button class="small" id="btnBackup" title="Download every cover and image as one JSON file">Back up</button><button class="small" id="btnRestore" title="Load a backup file">Restore</button><button class="small go" id="btnNew">+ New</button></span></h3>
+      <h3><span id="coverListTitle">Covers</span> <span class="acts"><button class="small" id="btnBackup" title="Download every cover and image as one JSON file">Back up</button><button class="small" id="btnRestore" title="Load a backup file">Restore</button><button class="small go" id="btnNew">+ New</button></span></h3>
       <div class="covers" id="coverList"></div>
       <div class="row" style="margin:6px 0 0"><span class="mono pickCount" style="color:var(--dim);font-size:10.5px;flex:1">none selected</span><button class="small btnExportPicked" disabled title="Export the ticked covers — one as a PNG, more as a ZIP">Export selected</button><button class="small ghost btnPickNone" title="Untick every cover">Clear</button></div>
     </div>
@@ -398,12 +428,18 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
     <div id="stageWrap">
       <canvas id="preview" width="360" height="640"></canvas>
       <svg id="guides" class="on" viewBox="0 0 1080 1920" preserveAspectRatio="none">
+        <g id="guidesPost" hidden>
+          <rect x="86" y="86" width="908" height="1178" fill="none" stroke="rgba(217,164,65,.55)" stroke-width="3" stroke-dasharray="14 12"/>
+          <text x="96" y="64" font-family="JetBrains Mono, monospace" font-size="26" fill="rgba(241,236,223,.55)">1080 × 1350 CAROUSEL · KEEP TYPE INSIDE</text>
+        </g>
+        <g id="guidesCover">
         <rect x="0" y="0" width="1080" height="240" fill="rgba(224,122,106,.10)"/>
         <rect x="0" y="1660" width="1080" height="260" fill="rgba(224,122,106,.10)"/>
         <rect x="0" y="240" width="1080" height="1440" fill="none" stroke="rgba(217,164,65,.55)" stroke-width="3" stroke-dasharray="14 12"/>
         <text x="48" y="215" font-family="JetBrains Mono, monospace" font-size="26" fill="rgba(241,236,223,.55)">PROFILE GRID CROP 3:4 · keep captions inside</text>
         <rect x="0" y="1470" width="1080" height="450" fill="none" stroke="rgba(127,179,166,.45)" stroke-width="3" stroke-dasharray="6 10"/>
         <text x="48" y="1890" font-family="JetBrains Mono, monospace" font-size="26" fill="rgba(127,179,166,.7)">REEL UI OVERLAY ZONE (caption, sound, buttons)</text>
+        </g>
       </svg>
       <div id="selBox" data-label=""><i class="gr nw" data-c="nw"></i><i class="gr ne" data-c="ne"></i><i class="gr se" data-c="se"></i><i class="gr sw" data-c="sw"></i></div>
       <div id="dropZone"><div><b>Drop to set the background</b><span>PNG with transparency lands as a cutout</span></div></div>
@@ -683,6 +719,25 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
 </section>
 
 <!-- ================= CUTOUT ================= -->
+<!-- ================= CAROUSEL POSTS ================= -->
+<section class="view" id="view-posts">
+  <div class="postwrap">
+    <div class="postbar">
+      <div>
+        <h2>Carousel posts</h2>
+        <p>Meta carousels at 1080 × 1350, three slides each: the hook, the practice, then the event. Open a slide to edit it with the same tools as a cover. The note under each slide is the art direction, not copy for the poster.</p>
+      </div>
+      <div class="acts">
+        <button class="small" id="btnNewCarousel">+ New carousel</button>
+        <button class="small" id="btnExportCarousels">Export every carousel</button>
+      </div>
+    </div>
+    <div class="pchips" id="postChips"></div>
+    <div id="postList"></div>
+    <div id="postEmpty" hidden>No carousels yet. <b>+ New carousel</b> starts one.</div>
+  </div>
+</section>
+
 <section class="view" id="view-cutout">
   <aside class="left">
     <div class="sec">
@@ -816,6 +871,7 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
 <script src="statics.js"></script>
 <script src="reels.js"></script>
 <script src="people.js"></script>
+<script src="posts.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

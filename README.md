@@ -19,6 +19,20 @@ same grips resize logos, rules and the subject cutout, staying inside the limits
 A thin element keeps only the bottom-right grip, so there is still something left to grab when
 moving it.
 
+**Carousel posts** — the **Carousel posts** tab is a second builder, for Meta carousels at
+1080 × 1350 instead of a 1080 × 1920 reel cover. It opens with the twenty Wa storyboards: three
+slides each, the hook, the practice and the event, with the art direction printed under every
+slide. Opening a slide puts it in the ordinary editor, where the rail lists that carousel rather
+than the covers, the guides show the 4:5 safe area and the export menu follows the frame.
+**Export carousel** gives a ZIP of the slides in posting order. Carousels can be added, copied
+and deleted, and **+ Slide** extends one, renumbering the `01 / 03` footers that have not been
+rewritten by hand. Posts never appear in the cover list, the profile grid or the mosaic.
+
+A document now carries its own `w`/`h`; one with neither is a cover, so nothing had to be
+migrated. Everything that draws or measures runs inside `withSize`, which sets the frame for the
+document in hand and puts back what was there. The copy lives in `posts.js`, and `seedPostSet`
+only ever adds a slide that is missing, so re-seeding cannot overwrite finished work.
+
 **Gradient fill** — a text layer, or just the words selected in its box, can take a gradient
 instead of a flat colour: twelve presets, two or three colours, an angle, and a sweep that runs
 once per line (which reads as foil) or once across the whole block. On selected words it is
