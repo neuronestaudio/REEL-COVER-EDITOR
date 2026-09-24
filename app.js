@@ -1546,17 +1546,43 @@ $('#btnSendPoster').onclick = async () => {
   setStatus('rendering…');
   try {
     const blob = await renderBlob(doc, 1, 'png');
-    const q = new URLSearchParams({ kind: 'cover', name: `${slug(doc.name)}-1080x1920.png`, job: posterJob(), text: coverText(doc), source: 'studio' });
+    const q = new URLSearchParams({ kind: 'cover', name: `${slug(doc.name)}-1080x1920.png`, job: posterJob(), text: coverText(doc), source: 'studio', doc: doc.id });
     const r = await fetch(`${POSTER}/api/upload?${q}`, { method: 'POST', body: blob, mode: 'cors' });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
     setStatus('saved', 'ok'); toast('Sent to Platform Poster');
-    if (window.opener) { try { window.opener.focus(); } catch {} }
+    // Opened from the poster: hand focus straight back and close this tab.
+    if (window.opener) { try { window.opener.focus(); } catch {} setTimeout(() => window.close(), 700); }
   } catch (e) {
     setStatus('saved', 'ok');
     toast(/fetch|network/i.test(e.message) ? 'Platform Poster is not running on this computer' : 'Send failed: ' + e.message);
   }
 };
 if (posterJob()) { $('#btnSendPoster').classList.add('primary'); $('#btnExport').classList.remove('primary'); }
+// Opened from the poster: #poster=<job>&doc=<id> reopens that cover; without a
+// doc, the photo the poster holds becomes the background of a fresh cover.
+async function importFromPoster() {
+  const job = posterJob(); if (!job) return false;
+  const docId = (location.hash.match(/doc=([a-z0-9_-]+)/i) || [])[1];
+  if (docId) { const r = covers.find(c => c.id === docId); if (r) { loadDoc(r.id === doc?.id ? doc : r.doc); switchView('editor'); return true; } }
+  let j; try { j = await (await fetch(`${POSTER}/api/jobs/${job}`, { mode: 'cors' })).json(); } catch { return false; }
+  const src = j.files?.source; if (!src) return false;
+  const key = `${job}:${src.at}`;
+  if (localStorage.getItem('rcs.posterImported') === key) { switchView('editor'); return true; }
+  setStatus('loading the photo from Platform Poster…');
+  try {
+    const blob = await (await fetch(`${POSTER}${src.url}`, { mode: 'cors' })).blob();
+    const a = await store.putAsset(blob, 'bg', (src.name || 'poster photo').replace(/\.[^.]+$/, '').slice(0, 40));
+    await new Promise(r => { const im = new Image(); im.onload = im.onerror = r; im.src = a.url; imgCache[a.id] = im; });
+    const d = baseDoc(`Poster · ${a.name}`);
+    d.bg = { ...d.bg, type: 'image', image: a.id, fit: 'fill', scale: 1, x: 0, y: 0 };
+    d.overlay = { type: 'none', color: '#000000', opacity: 0 };
+    d.layers = [];
+    loadDoc(d); await persistCurrent(); renderBgPick(); refreshAssetSelects();
+    localStorage.setItem('rcs.posterImported', key);
+    switchView('editor'); toast('Photo from Platform Poster loaded. Design it, then Send to Poster.');
+    return true;
+  } catch (e) { console.warn('poster import', e); setStatus('saved', 'ok'); return false; }
+}
 
 $('#btnExportAll').onclick = async () => {
   if (!covers.length) return toast('Nothing to export');
@@ -2938,10 +2964,11 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   }
   setStatus('saved in this browser', 'ok');
   getImg('photo'); getImg('cutout');
+  const fromPoster = await importFromPoster();
   await loadShared();   // the live sets use shared photographs, so they have to be listed first
   if (settings.waLive !== WA_LIVE) { try { await seedWaSets(); } catch (e) { console.warn('live sets', e); } }
   // a first visit, or a link ending #grid, opens straight on the profile
-  if (seeded || todo || location.hash === '#grid') switchView('grid');
+  if (!fromPoster && (seeded || todo || location.hash === '#grid')) switchView('grid');
   if (location.hash === '#posts') switchView('posts');   // a link straight to the carousels
   if (todo) { // the statics sit above the queue, so bring the first cover still to do into view
     const next = (settings.gridOrder || []).find(id => onPlaceholder(covers.find(c => c.id === id)?.doc));
