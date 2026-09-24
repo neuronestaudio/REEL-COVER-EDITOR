@@ -1535,6 +1535,29 @@ $('#btnExport').onclick = async () => {
   setStatus('rendering…'); const blob = await renderBlob(doc, scale, type);
   const ok = await store.download(`${slug(doc.name)}-${W * scale}x${H * scale}.${type}`, blob); toast(ok ? 'Exported' : 'Export cancelled'); setStatus('saved', 'ok');
 };
+/* ---------------- Platform Poster bridge ----------------
+   The posting tool (D:\TOOLS\platform-poster) listens on localhost:8130 on
+   Dion's machine. Opened from it as #poster=<jobId>, Send attaches this cover
+   to that post; opened by hand, Send lands on whichever post is open there. */
+const POSTER = 'http://localhost:8130';
+const posterJob = () => (location.hash.match(/poster=([a-z0-9-]+)/i) || [])[1] || '';
+function coverText(d) { return (d.layers || []).filter(l => (l.kind || l.type) === 'text' && l.text).map(l => String(l.text).replace(/\s+/g, ' ').trim()).filter(Boolean).join(' · '); }
+$('#btnSendPoster').onclick = async () => {
+  setStatus('rendering…');
+  try {
+    const blob = await renderBlob(doc, 1, 'png');
+    const q = new URLSearchParams({ kind: 'cover', name: `${slug(doc.name)}-1080x1920.png`, job: posterJob(), text: coverText(doc), source: 'studio' });
+    const r = await fetch(`${POSTER}/api/upload?${q}`, { method: 'POST', body: blob, mode: 'cors' });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
+    setStatus('saved', 'ok'); toast('Sent to Platform Poster');
+    if (window.opener) { try { window.opener.focus(); } catch {} }
+  } catch (e) {
+    setStatus('saved', 'ok');
+    toast(/fetch|network/i.test(e.message) ? 'Platform Poster is not running on this computer' : 'Send failed: ' + e.message);
+  }
+};
+if (posterJob()) { $('#btnSendPoster').classList.add('primary'); $('#btnExport').classList.remove('primary'); }
+
 $('#btnExportAll').onclick = async () => {
   if (!covers.length) return toast('Nothing to export');
   toast('Rendering ' + covers.length + ' covers…'); const zip = new JSZip(); const order = gridOrdered();
