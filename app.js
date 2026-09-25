@@ -2621,7 +2621,7 @@ const builtinCtas = () => (rtsAds().ctas || []).map(c => ({ ...c, name: c.id, bu
 function ctaBadgeLayers(line, button) {
   const mk = p => newText(Object.assign({ font: RTS.font, align: 'center', x: 0.5, color: RTS.white, box: 'none', outline: 0, shadow: 0.3, behind: false }, p));
   const L = [], btnH = 54, gap = 26;
-  const t = line ? mk({ text: line, weight: 400, size: 24, track: 0.01, line: 1.35, width: 0.74, color: '#e6dfd2', shadow: 0.5 }) : null;
+  const t = line ? mk({ text: line, weight: 400, italic: true, size: 24, track: 0, line: 1.35, width: 0.74, color: '#e6dfd2', shadow: 0.5 }) : null;
   const b = button ? mk({ text: button, weight: 600, size: 17, track: 0.2, line: 1.2, width: 0.86, upper: true, shadow: 0 }) : null;
   if (t) t.width = balancedWidth(t);
   const tH = t ? measureLayer(t).height : 0;
@@ -2639,7 +2639,7 @@ function ctaBadgeLayers(line, button) {
 async function placeCta(name, line, button) {
   line = (line || '').trim(); button = (button || '').trim();
   if (!line && !button) return toast('Write a line or a button first');
-  await loadAdFonts();
+  if (!(await adFontsReady())) return toast('Fraunces is still loading — try again in a moment');
   if (doc.ad) {
     pushUndo();
     relayAd(doc, { line, cta: button });
@@ -3039,8 +3039,15 @@ const staticById = id => (window.__RTS_STATICS__ || []).find(s => s.id === id) |
 const adBoardCfg = (setKey, id) => ((rtsAds().sets.find(s => s.key === setKey) || {}).boards || []).find(b => b.id === id);
 /* A board's source copy: statics.js by id, overlaid by the words a board carries in ads.js (v3 has no statics entry). */
 const adSource = (setKey, id) => ({ ...staticById(id), ...((adBoardCfg(setKey, id) || {}).copy || {}) });
+const AD_FONT_FACES = ['400 100px "Fraunces"', '500 100px "Fraunces"', '600 100px "Fraunces"', 'italic 400 100px "Fraunces"'];
 function loadAdFonts() {
-  return Promise.allSettled(['400 100px "Fraunces"', '500 100px "Fraunces"', '600 100px "Fraunces"', 'italic 400 100px "Fraunces"'].map(f => document.fonts.load(f)));
+  return Promise.allSettled(AD_FONT_FACES.map(f => document.fonts.load(f)));
+}
+/* Layout measures the words, so it must never run on a fallback face: a headline measured narrow
+   would wrap an extra line once Fraunces arrives and run into the sub-line. */
+async function adFontsReady() {
+  await loadAdFonts();
+  return AD_FONT_FACES.every(f => document.fonts.check(f));
 }
 /* CSS text-wrap: balance, emulated: the narrowest measure that keeps the line count. */
 function balancedWidth(l) {
@@ -3067,8 +3074,8 @@ function adLayers(o) {
   const head = mk({ role: 'head', text: o.head || '', weight: 400, size: adHeadSize(o.head, layout), track: layout === 'type' ? -0.015 : -0.008, line: 1.02, width: span, upper: false });
   head.width = balancedWidth(head);
   const sub = o.sub ? mk({ role: 'sub', text: o.sub, weight: 400, italic: true, size: 25, track: 0, line: 1.3, width: Math.min(0.704, span), color: '#f1ece2', shadow: 0.3 }) : null;
-  // the CTA / positioning line: a quiet footer under the sub-line, above the button
-  const line = o.line ? mk({ role: 'line', text: o.line, weight: 400, size: 21, track: 0.01, line: 1.35, width: Math.min(0.74, span), color: '#cfc8bb', shadow: 0.3 }) : null;
+  // the CTA / positioning line: a quiet footer under the sub-line, above the button, in the sub-line's italic
+  const line = o.line ? mk({ role: 'line', text: o.line, weight: 400, italic: true, size: 21, track: 0, line: 1.35, width: Math.min(0.74, span), color: '#cfc8bb', shadow: 0.3 }) : null;
   if (line) line.width = balancedWidth(line);
   const cta = o.cta ? mk({ role: 'cta', text: o.cta, weight: 600, size: 16, track: 0.2, line: 1.2, width: span, upper: true, shadow: 0 }) : null;
   const gap = 18, btnH = 53, sig = sigExtent(), sy = H - AD_INSET - sig.down;
@@ -3169,6 +3176,18 @@ async function seedAdSet() {
   if (recs.length) { await store.saveCovers(recs); covers = covers.concat(recs); }
   settings.adSet = AD_SET; settings.adLayout = AD_LAYOUT; await store.saveSettings(settings).catch(() => {});
   return recs.length > 0;
+}
+/* The first v3 boards set their CTA line upright; the line is italic now, like every other small line on
+   the boards. Re-lay just the boards still carrying an upright line (edited words are kept, see relayAd). */
+async function fixAdLines() {
+  const stale = covers.filter(c => c.doc && c.doc.ad && (c.doc.layers || []).some(l => l.role === 'line' && !l.italic));
+  if (stale.length) {
+    if (!(await adFontsReady())) return;   // try again on the next visit rather than lay out on a fallback face
+    await preloadAssets(['rtsMark', 'rtsShinbukan', 'rtsSeizanji']);
+    for (const c of stale) { try { relayAd(c.doc); } catch (e) { console.warn('re-lay line', c.doc.ad.id, e); } }
+    await store.saveCovers(stale);
+  }
+  settings.adLines = 2; await store.saveSettings(settings).catch(() => {});
 }
 
 /* ---------------- the static ads view ---------------- */
@@ -3346,6 +3365,7 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   if (settings.mosaicSet !== MOSAIC_SET) { try { await seedMosaicSet(); } catch (e) { console.warn('mosaic set', e); } }
   if (settings.postSet !== POST_SET) { try { await seedPostSet(); } catch (e) { console.warn('post set', e); } }
   if (settings.adSet !== AD_SET || settings.adLayout !== AD_LAYOUT) { try { await seedAdSet(); } catch (e) { console.warn('ad set', e); } }
+  if (settings.adLines !== 2) { try { await fixAdLines(); } catch (e) { console.warn('ad lines', e); } }
   const todo = location.hash === '#todo';
   if (todo && settings.reelSet !== REEL_SET) { try { await seedReelSet(); } catch (e) { console.warn('reel set', e); } }
   if (settings.demoView !== DEMO_VIEW) { settings.shape = '34'; settings.demoView = DEMO_VIEW; store.saveSettings(settings).catch(() => {}); }
