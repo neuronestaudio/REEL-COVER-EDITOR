@@ -2472,15 +2472,29 @@ function staticLayers(s) {
 }
 /* The signature strip on its own, centred on height `sy` (0..1): ensō mark, name,
    role line, Shinbukan and Seizanji crests. Shared by the statics and the Blocks panel. */
-function signatureLayers(sy) {
-  const mk = o => newText(Object.assign({ font: RTS.font, align: 'left', x: 0.145, color: RTS.white, box: 'none', outline: 0, shadow: 0.45, behind: false }, o));
+const SIG_W = { mark: 0.059, shinbukan: 0.043, seizanji: 0.078 };   // mark widths as a share of W
+function signatureLayers(sy, ins) {
+  // ins (px): keep the strip that far in from both sides — the static ads' safe box. Without it the
+  // reel-cover positions stand, so the statics and the Blocks panel render as before.
+  const mw = SIG_W.mark * W, sw = SIG_W.shinbukan * W, zw = SIG_W.seizanji * W, tag = ins == null ? {} : { role: 'sig' };
+  const mx = ins == null ? 0.098 : (ins + mw / 2) / W, nx = ins == null ? 0.145 : (ins + mw + 19) / W;
+  const zx = ins == null ? 0.895 : (W - ins - zw / 2) / W, sx = ins == null ? 0.815 : (W - ins - zw - 21 - sw / 2) / W;
+  const mk = o => newText(Object.assign({ font: RTS.font, align: 'left', x: nx, color: RTS.white, box: 'none', outline: 0, shadow: 0.45, behind: false }, tag, o));
   return [
-    newLogo({ image: 'rtsMark', x: 0.098, y: sy, size: 0.059, alpha: 0.92 }),
+    newLogo({ image: 'rtsMark', x: mx, y: sy, size: SIG_W.mark, alpha: 0.92, ...tag }),
     mk({ text: 'Harrison Saito', weight: 500, size: 28, track: 0, line: 1.05, width: 0.5, y: (sy * H - 31) / H, shadow: 0.25 }),
     mk({ text: 'Educator. Martial Artist. Coach.', weight: 500, size: 14, track: 0.18, line: 1.2, width: 0.6, upper: true, y: (sy * H + 5) / H, color: '#cfc7b8', shadow: 0 }),
-    newLogo({ image: 'rtsShinbukan', x: 0.815, y: sy, size: 0.043, alpha: 0.9 }),
-    newLogo({ image: 'rtsSeizanji', x: 0.895, y: sy, size: 0.078, alpha: 0.9 }),
+    newLogo({ image: 'rtsShinbukan', x: sx, y: sy, size: SIG_W.shinbukan, alpha: 0.9, ...tag }),
+    newLogo({ image: 'rtsSeizanji', x: zx, y: sy, size: SIG_W.seizanji, alpha: 0.9, ...tag }),
   ];
+}
+/* How far the signature strip reaches above and below its centre line: the tallest mark
+   (natural aspect once loaded, square until then) or the name and role lines. */
+function sigExtent() {
+  const half = Math.max(...[['rtsMark', SIG_W.mark], ['rtsShinbukan', SIG_W.shinbukan], ['rtsSeizanji', SIG_W.seizanji]].map(([id, w]) => {
+    const im = getImg(id); return w * W * (im && im.naturalWidth ? im.naturalHeight / im.naturalWidth : 1) / 2;
+  }));
+  return { up: Math.max(half, 31), down: Math.max(half, 5 + 14 * 1.2) };
 }
 function buildStaticDoc(s) {
   const d = baseDoc(`${s.id} \u00b7 ${s.name}`);
@@ -2940,12 +2954,13 @@ $('#btnExportCarousels').onclick = () => exportAllCarousels();
    board once at 1080×1350 and never rebuilds one that is already there. A square
    or story variant is a second document with the same copy on a new frame. */
 const AD_SET = 'rts-ads-v1';
+const AD_LAYOUT = 2;   // adLayers revision: 2 = inside the safe box, sentence-case regular headline (25 Sep 2026)
 const AD_FRAMES = { '4x5': { w: 1080, h: 1350, label: 'Feed 4:5' }, '1x1': { w: 1080, h: 1080, label: 'Square 1:1' }, '9x16': { w: 1080, h: 1920, label: 'Story 9:16' } };
 const rtsAds = () => window.__RTS_ADS__ || { sets: [], plates: [] };
 const staticById = id => (window.__RTS_STATICS__ || []).find(s => s.id === id) || {};
 const adBoardCfg = (setKey, id) => ((rtsAds().sets.find(s => s.key === setKey) || {}).boards || []).find(b => b.id === id);
 function loadAdFonts() {
-  return Promise.allSettled(['500 100px "Fraunces"', '600 100px "Fraunces"', 'italic 400 100px "Fraunces"'].map(f => document.fonts.load(f)));
+  return Promise.allSettled(['400 100px "Fraunces"', '500 100px "Fraunces"', '600 100px "Fraunces"', 'italic 400 100px "Fraunces"'].map(f => document.fonts.load(f)));
 }
 /* CSS text-wrap: balance, emulated: the narrowest measure that keeps the line count. */
 function balancedWidth(l) {
@@ -2957,24 +2972,34 @@ function balancedWidth(l) {
 /* The v1 CSS sizes (92/64/54/47, type 118) less 7%: canvas text has no optical-size axis, so Fraunces
    renders wider than the boards' opsz 144 and the same size would break a line later than they did. */
 function adHeadSize(t, layout) { if (layout === 'type') return 110; const n = (t || '').length; return n <= 32 ? 86 : n <= 62 ? 60 : n <= 92 ? 50 : 44; }
-/* The v1 boards' CSS as layers: the block sits 84px in from the sides and is
-   stacked up from a floor 160px above the bottom (170 for the split layout, 190
-   for graphic and type), 18px between items, the signature strip 56px off the
-   floor. Floor offsets are in pixels, so the same code lays out a square or a
-   story. Each text layer carries a role so a variant can pick the copy back up. */
+/* The v1 boards' CSS as layers, kept inside the safe box: AD_INSET px in on every side (the 4:5
+   guide's "keep type inside" rectangle, held on the square and the story too). The signature
+   strip sits on the box floor, the block is stacked up from 44px above it (54 split, 74 graphic
+   and type), 18px between items; a block that would reach the top edge steps its headline down.
+   The headline is sentence case in the regular weight (25 Sep 2026, Dion: "non bold"). Each text
+   layer carries a role so a variant, or a re-lay, can pick the copy back up. */
+const AD_INSET = 86;
 function adLayers(o) {
   const layout = o.layout || 'cover', left = layout === 'split';
-  const align = left ? 'left' : 'center', ax = left ? 84 / W : 0.5;
+  const align = left ? 'left' : 'center', ax = left ? AD_INSET / W : 0.5, span = (W - 2 * AD_INSET) / W;
   const mk = p => newText(Object.assign({ font: RTS.font, align, x: ax, color: RTS.white, box: 'none', outline: 0, shadow: 0.45, behind: false }, p));
-  const kicker = o.kicker ? mk({ role: 'kicker', text: o.kicker, weight: 600, size: 16, track: 0.24, line: 1.2, width: 0.844, upper: true, color: '#cfc8bb', shadow: 0.3 }) : null;
-  const head = mk({ role: 'head', text: o.head || '', weight: 500, size: adHeadSize(o.head, layout), track: layout === 'type' ? -0.015 : -0.008, line: 1.02, width: 0.844, upper: true });
+  const kicker = o.kicker ? mk({ role: 'kicker', text: o.kicker, weight: 600, size: 16, track: 0.24, line: 1.2, width: span, upper: true, color: '#cfc8bb', shadow: 0.3 }) : null;
+  const head = mk({ role: 'head', text: o.head || '', weight: 400, size: adHeadSize(o.head, layout), track: layout === 'type' ? -0.015 : -0.008, line: 1.02, width: span, upper: false });
   head.width = balancedWidth(head);
-  const sub = o.sub ? mk({ role: 'sub', text: o.sub, weight: 400, italic: true, size: 25, track: 0, line: 1.3, width: 0.704, color: '#f1ece2', shadow: 0.3 }) : null;
-  const cta = o.cta ? mk({ role: 'cta', text: o.cta, weight: 600, size: 16, track: 0.2, line: 1.2, width: 0.844, upper: true, shadow: 0 }) : null;
-  const gap = 18, btnH = 53, floor = H - (left ? 170 : layout === 'graphic' || layout === 'type' ? 190 : 160);
-  const kH = kicker ? measureLayer(kicker).height : 0, hH = measureLayer(head).height, sH = sub ? measureLayer(sub).height : 0;
-  const total = (kicker ? kH + gap : 0) + hH + gap + 3 + gap + sH + 4 + (cta ? 8 + gap + btnH : 0);
-  let y = floor - total; const L = [];
+  const sub = o.sub ? mk({ role: 'sub', text: o.sub, weight: 400, italic: true, size: 25, track: 0, line: 1.3, width: Math.min(0.704, span), color: '#f1ece2', shadow: 0.3 }) : null;
+  const cta = o.cta ? mk({ role: 'cta', text: o.cta, weight: 600, size: 16, track: 0.2, line: 1.2, width: span, upper: true, shadow: 0 }) : null;
+  const gap = 18, btnH = 53, sig = sigExtent(), sy = H - AD_INSET - sig.down;
+  const floor = sy - sig.up - (left ? 50 : layout === 'graphic' || layout === 'type' ? 70 : 40);
+  const kH = kicker ? measureLayer(kicker).height : 0, sH = sub ? measureLayer(sub).height : 0;
+  let hH, total, y;
+  for (;;) {
+    hH = measureLayer(head).height;
+    total = (kicker ? kH + gap : 0) + hH + gap + 3 + gap + sH + 4 + (cta ? 8 + gap + btnH : 0);
+    y = floor - total;
+    if (y >= AD_INSET || head.size <= 36) break;
+    head.size -= 4; head.width = balancedWidth({ ...head, width: span });
+  }
+  const L = [];
   if (layout === 'archival') { // the hairline frame, 40px in
     const c = '#fbf7ef', a = 0.45;
     L.push(newRule({ role: 'frame', x: 0.5, y: 40 / H, width: (W - 80) / W, thick: 1, color: c, alpha: a }), newRule({ role: 'frame', x: 0.5, y: (H - 40) / H, width: (W - 80) / W, thick: 1, color: c, alpha: a }),
@@ -2991,8 +3016,28 @@ function adLayers(o) {
     L.push(newRule({ role: 'button', x: left ? ax + bw / 2 / W : 0.5, y: yc / H, width: bw / W, thick: btnH, color: RTS.red, alpha: 1 }));
     cta.y = (yc - cta.size * cta.line / 2) / H; L.push(cta);
   }
-  L.push(...signatureLayers((H - 88) / H));
+  L.push(...signatureLayers(sy / H, AD_INSET));
   return L;
+}
+/* Lay a board out again with the current adLayers, from the copy it carries: edited words, part
+   colour and gradients stay; positions, sizes and weights follow the layout; layers added by hand
+   (no role, not the signature strip) are kept on top. */
+function relayAd(d) {
+  withSize(d, () => {
+    const copy = adCopyOf(d), old = d.layers || [];
+    const isSig = l => l.role === 'sig' || (l.type === 'logo' && ['rtsMark', 'rtsShinbukan', 'rtsSeizanji'].includes(l.image))
+      || (l.type === 'text' && !l.role && ['Harrison Saito', 'Educator. Martial Artist. Coach.'].includes(l.text));
+    const own = old.filter(l => !l.role && !isSig(l));
+    const fresh = adLayers({ layout: d.ad.layout, kicker: copy.kicker, head: copy.head, sub: copy.sub, cta: copy.cta });
+    for (const l of fresh) {
+      if (l.type !== 'text' || !l.role) continue;
+      const o = old.find(x => x.type === 'text' && x.role === l.role); if (!o) continue;
+      if (o.spans && o.spans.length) l.spans = JSON.parse(JSON.stringify(o.spans));
+      if (o.grad) l.grad = JSON.parse(JSON.stringify(o.grad));
+    }
+    d.layers = fresh.concat(own);
+  });
+  d.ad.rev = AD_LAYOUT;
 }
 /* The copy a board carries now — its edited layers first, statics.js as the fallback. */
 function adCopyOf(d) {
@@ -3015,7 +3060,7 @@ function adDoc(set, b, frame, copy) {
   d.bg = { ...d.bg, type: 'image', image: b.bg, fit: 'fill', scale: 1, x: 0, y, blur: 0, bright: 1, sat: 1, pad: RTS.ink };
   d.overlay = { type: b.scrim ? 'scrim' : 'none', color: '#0c0905', opacity: b.scrim || 0 };
   d.layers = withSize(fr, () => adLayers({ layout: b.layout, kicker: copy.kicker, head: copy.head, sub: copy.sub, cta: copy.cta }));
-  d.ad = { set: AD_SET, key: `${set.key}:${b.id}:${frame}`, setKey: set.key, id: b.id, name: copy.name || b.id, layout: b.layout || 'cover', frame, ver: set.ver || '01', flag: b.flag || '', pair: b.pair || '' };
+  d.ad = { set: AD_SET, rev: AD_LAYOUT, key: `${set.key}:${b.id}:${frame}`, setKey: set.key, id: b.id, name: copy.name || b.id, layout: b.layout || 'cover', frame, ver: set.ver || '01', flag: b.flag || '', pair: b.pair || '' };
   return d;
 }
 async function seedAdSet() {
@@ -3023,7 +3068,11 @@ async function seedAdSet() {
   setStatus('loading the static ads…');
   await loadAdFonts();
   const have = new Set(covers.filter(c => c.doc && c.doc.ad).map(c => c.doc.ad.key));
-  await preloadAssets([...new Set(cfg.sets.flatMap(s => s.boards.map(b => b.bg)))]);
+  await preloadAssets([...new Set(cfg.sets.flatMap(s => s.boards.map(b => b.bg))), 'rtsMark', 'rtsShinbukan', 'rtsSeizanji']);
+  // boards laid out by an earlier adLayers are laid out again from their own copy (see relayAd)
+  const relaid = covers.filter(c => c.doc && c.doc.ad && c.doc.ad.rev !== AD_LAYOUT);
+  for (const c of relaid) { try { relayAd(c.doc); } catch (e) { console.warn('re-lay', c.doc.ad.id, e); } }
+  if (relaid.length) await store.saveCovers(relaid);
   // stamped older than the covers, so the studio still opens on the latest cover
   let t = Math.min(Date.now(), ...covers.map(c => c.createdAt || Date.now())) - 72e5;
   const recs = [];
@@ -3034,7 +3083,7 @@ async function seedAdSet() {
     d.createdAt = d.updatedAt = t++; recs.push(coverRecord(d));
   }
   if (recs.length) { await store.saveCovers(recs); covers = covers.concat(recs); }
-  settings.adSet = AD_SET; await store.saveSettings(settings).catch(() => {});
+  settings.adSet = AD_SET; settings.adLayout = AD_LAYOUT; await store.saveSettings(settings).catch(() => {});
   return recs.length > 0;
 }
 
@@ -3190,7 +3239,9 @@ $$('nav.tabs button').forEach(b => b.onclick = () => switchView(b.dataset.view))
 document.fonts.addEventListener('loadingdone', () => { renderAll(); renderCoverList(); renderTemplates(); if ($('#view-grid').classList.contains('active')) renderGrid(); });
 
 /* A read-only handle on the live state, for the console and for tests. */
-window.__rcs = { get settings() { return settings; }, get covers() { return covers; }, get doc() { return doc; }, get spanOpts() { return spanOpts; }, get mosaicOpts() { return mosaicOpts; }, assetsOf, setSpanAt, switchView, adGroups, renderAds };
+window.__rcs = { get settings() { return settings; }, get covers() { return covers; }, get doc() { return doc; }, get spanOpts() { return spanOpts; }, get mosaicOpts() { return mosaicOpts; }, assetsOf, setSpanAt, switchView, adGroups, renderAds, renderBlob,
+  // test hook: the drawn box of every layer of a doc, at 1:1
+  layerBoxes(d) { const b = {}, sz = sizeOf(d), c = document.createElement('canvas'); c.width = sz.w; c.height = sz.h; render(c.getContext('2d'), d, 1, b); return b; } };
 
 /* ---------------- boot ---------------- */
 (async () => {
@@ -3209,7 +3260,7 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   if (settings.staticSet !== STATIC_SET) { try { await seedStaticSet(); } catch (e) { console.warn('static set', e); } }
   if (settings.mosaicSet !== MOSAIC_SET) { try { await seedMosaicSet(); } catch (e) { console.warn('mosaic set', e); } }
   if (settings.postSet !== POST_SET) { try { await seedPostSet(); } catch (e) { console.warn('post set', e); } }
-  if (settings.adSet !== AD_SET) { try { await seedAdSet(); } catch (e) { console.warn('ad set', e); } }
+  if (settings.adSet !== AD_SET || settings.adLayout !== AD_LAYOUT) { try { await seedAdSet(); } catch (e) { console.warn('ad set', e); } }
   const todo = location.hash === '#todo';
   if (todo && settings.reelSet !== REEL_SET) { try { await seedReelSet(); } catch (e) { console.warn('reel set', e); } }
   if (settings.demoView !== DEMO_VIEW) { settings.shape = '34'; settings.demoView = DEMO_VIEW; store.saveSettings(settings).catch(() => {}); }
