@@ -301,7 +301,12 @@ function bgBox(b, im) {
   const base = b.fit === 'fit' ? Math.min(W / im.naturalWidth, H / im.naturalHeight) : Math.max(W / im.naturalWidth, H / im.naturalHeight);
   const s = base * b.scale * (1 + b.blur / 120);
   const w = im.naturalWidth * s, h = im.naturalHeight * s;
-  return { x: (W - w) / 2 + b.x * Math.max((w - W) / 2, W * .25), y: (H - h) / 2 + b.y * Math.max((h - H) / 2, H * .25), w, h };
+  let x = (W - w) / 2 + b.x * Math.max((w - W) / 2, W * .25), y = (H - h) / 2 + b.y * Math.max((h - H) / 2, H * .25);
+  // A filling picture never leaves the frame on an axis it covers: the pan range has a W/4 (H/4) floor so a
+  // picture with no overhang can still be nudged, which let a stray drag on the canvas push the photo off the
+  // edge and export a band of pad (Dion, 25 Sep 2026: "all my exports seem slightly cropped").
+  if (b.fit !== 'fit') { if (w >= W) x = clamp(x, W - w, 0); if (h >= H) y = clamp(y, H - h, 0); }
+  return { x, y, w, h };
 }
 function drawBackground(x, doc) {
   const b = doc.bg;
@@ -699,8 +704,11 @@ preview.addEventListener('pointermove', e => {
   if (drag.id === '__bg') { // pan the background image within its overhang
     const im = getImg(doc.bg.image); if (!im) return;
     const bb = bgBox(doc.bg, im);
-    t.x = clamp(drag.x0 + (p.x - drag.p.x) / Math.max((bb.w - W) / 2, W * .25), -1, 1);
-    t.y = clamp(drag.y0 + (p.y - drag.p.y) / Math.max((bb.h - H) / 2, H * .25), -1, 1);
+    // the stored value stops where the picture stops (bgBox clamps the drawing), so dragging back responds at once
+    const lim = (n, N) => doc.bg.fit === 'fit' || n < N ? 1 : (n - N) / 2 / Math.max((n - N) / 2, N * .25);
+    const lx = lim(bb.w, W), ly = lim(bb.h, H);
+    t.x = clamp(drag.x0 + (p.x - drag.p.x) / Math.max((bb.w - W) / 2, W * .25), -lx, lx);
+    t.y = clamp(drag.y0 + (p.y - drag.p.y) / Math.max((bb.h - H) / 2, H * .25), -ly, ly);
     t.x = +t.x.toFixed(4); t.y = +t.y.toFixed(4); renderAll(); ['bgX', 'bgY'].forEach(id => $('#' + id)._sync()); return;
   }
   t.x = +(drag.x0 + dx).toFixed(4); t.y = +(drag.y0 + dy).toFixed(4); renderAll(); syncPropsLite();
