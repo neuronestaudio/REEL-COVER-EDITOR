@@ -135,6 +135,12 @@ cover in that browser. On a static ad a badge replaces the board's own footer li
 lays the board out again inside the safe box; on anything else it lands as ordinary layers near
 the foot. Either way it is one undo step.
 
+**Ad footer** — on every static ad the signature strip (ensō mark, name, role line, both dojo
+crests) is drawn 1.3× the reel-cover size (`AD_SIG` in `app.js`), with its top edge where the
+smaller strip's was, so it grows into the bottom margin and the copy above does not move. Boards
+made before the change get the bigger strip once, and only where the strip is still as the layout
+left it; one moved or resized by hand is left alone.
+
 **Static Set v3 — nine angles** — the nine headline-led angles from the static ad copy bank
 (25 Sep 2026), boards A5.1–A5.9 on the Static Ads tab, each on an unused Day 1 still (A5.9 on the
 type plate, as the brief asks for a quiet visual) with the CTA line that matches its angle as a

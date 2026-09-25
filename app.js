@@ -2481,28 +2481,29 @@ function staticLayers(s) {
 /* The signature strip on its own, centred on height `sy` (0..1): ensō mark, name,
    role line, Shinbukan and Seizanji crests. Shared by the statics and the Blocks panel. */
 const SIG_W = { mark: 0.059, shinbukan: 0.043, seizanji: 0.078 };   // mark widths as a share of W
-function signatureLayers(sy, ins) {
+function signatureLayers(sy, ins, k = 1) {
   // ins (px): keep the strip that far in from both sides — the static ads' safe box. Without it the
   // reel-cover positions stand, so the statics and the Blocks panel render as before.
-  const mw = SIG_W.mark * W, sw = SIG_W.shinbukan * W, zw = SIG_W.seizanji * W, tag = ins == null ? {} : { role: 'sig' };
-  const mx = ins == null ? 0.098 : (ins + mw / 2) / W, nx = ins == null ? 0.145 : (ins + mw + 19) / W;
-  const zx = ins == null ? 0.895 : (W - ins - zw / 2) / W, sx = ins == null ? 0.815 : (W - ins - zw - 21 - sw / 2) / W;
+  // k: scale of the whole strip — marks, type and gaps (the static ads set it larger, AD_SIG).
+  const mw = SIG_W.mark * k * W, sw = SIG_W.shinbukan * k * W, zw = SIG_W.seizanji * k * W, tag = ins == null ? {} : { role: 'sig' };
+  const mx = ins == null ? 0.098 : (ins + mw / 2) / W, nx = ins == null ? 0.145 : (ins + mw + 19 * k) / W;
+  const zx = ins == null ? 0.895 : (W - ins - zw / 2) / W, sx = ins == null ? 0.815 : (W - ins - zw - 21 * k - sw / 2) / W;
   const mk = o => newText(Object.assign({ font: RTS.font, align: 'left', x: nx, color: RTS.white, box: 'none', outline: 0, shadow: 0.45, behind: false }, tag, o));
   return [
-    newLogo({ image: 'rtsMark', x: mx, y: sy, size: SIG_W.mark, alpha: 0.92, ...tag }),
-    mk({ text: 'Harrison Saito', weight: 500, size: 28, track: 0, line: 1.05, width: 0.5, y: (sy * H - 31) / H, shadow: 0.25 }),
-    mk({ text: 'Educator. Martial Artist. Coach.', weight: 500, size: 14, track: 0.18, line: 1.2, width: 0.6, upper: true, y: (sy * H + 5) / H, color: '#cfc7b8', shadow: 0 }),
-    newLogo({ image: 'rtsShinbukan', x: sx, y: sy, size: SIG_W.shinbukan, alpha: 0.9, ...tag }),
-    newLogo({ image: 'rtsSeizanji', x: zx, y: sy, size: SIG_W.seizanji, alpha: 0.9, ...tag }),
+    newLogo({ image: 'rtsMark', x: mx, y: sy, size: SIG_W.mark * k, alpha: 0.92, ...tag }),
+    mk({ text: 'Harrison Saito', weight: 500, size: 28 * k, track: 0, line: 1.05, width: 0.5, y: (sy * H - 31 * k) / H, shadow: 0.25 }),
+    mk({ text: 'Educator. Martial Artist. Coach.', weight: 500, size: 14 * k, track: 0.18, line: 1.2, width: 0.6, upper: true, y: (sy * H + 5 * k) / H, color: '#cfc7b8', shadow: 0 }),
+    newLogo({ image: 'rtsShinbukan', x: sx, y: sy, size: SIG_W.shinbukan * k, alpha: 0.9, ...tag }),
+    newLogo({ image: 'rtsSeizanji', x: zx, y: sy, size: SIG_W.seizanji * k, alpha: 0.9, ...tag }),
   ];
 }
 /* How far the signature strip reaches above and below its centre line: the tallest mark
    (natural aspect once loaded, square until then) or the name and role lines. */
-function sigExtent() {
+function sigExtent(k = 1) {
   const half = Math.max(...[['rtsMark', SIG_W.mark], ['rtsShinbukan', SIG_W.shinbukan], ['rtsSeizanji', SIG_W.seizanji]].map(([id, w]) => {
-    const im = getImg(id); return w * W * (im && im.naturalWidth ? im.naturalHeight / im.naturalWidth : 1) / 2;
+    const im = getImg(id); return w * k * W * (im && im.naturalWidth ? im.naturalHeight / im.naturalWidth : 1) / 2;
   }));
-  return { up: Math.max(half, 31), down: Math.max(half, 5 + 14 * 1.2) };
+  return { up: Math.max(half, 31 * k), down: Math.max(half, (5 + 14 * 1.2) * k) };
 }
 function buildStaticDoc(s) {
   const d = baseDoc(`${s.id} \u00b7 ${s.name}`);
@@ -3066,6 +3067,42 @@ function adHeadSize(t, layout) { if (layout === 'type') return 110; const n = (t
    The headline is sentence case in the regular weight (25 Sep 2026, Dion: "non bold"). Each text
    layer carries a role so a variant, or a re-lay, can pick the copy back up. */
 const AD_INSET = 86;
+/* The footer strip on the ads is drawn AD_SIG times the reel-cover size (25 Sep 2026, Dion: "bigger and
+   more apparent"). Its top edge stays where the smaller strip's was, so the copy above it keeps its
+   place and the strip grows down into the margin (about 67px from the foot instead of 86). */
+const AD_SIG = 1.3;
+function adSigY() {
+  const s1 = sigExtent(1), sk = sigExtent(AD_SIG);
+  return H - AD_INSET - s1.down - s1.up + sk.up;
+}
+/* Boards laid out with the smaller strip get the bigger one in place: only the strip's own layers are
+   replaced, and only on a board whose strip is still where and how the layout put it, so a strip that
+   was moved or resized by hand, and everything else on the board, is left exactly as it is. */
+function enlargeAdSig(d) {
+  let done = false;
+  withSize(d, () => {
+    const isSig = l => l.role === 'sig';
+    const mark = (d.layers || []).find(l => isSig(l) && l.type === 'logo' && l.image === 'rtsMark');
+    const s1 = sigExtent(1), oldY = (H - AD_INSET - s1.down) / H;
+    if (!mark || Math.abs(mark.size - SIG_W.mark) > 1e-6 || Math.abs(mark.y - oldY) > 3 / H) return;
+    const at = d.layers.findIndex(isSig);
+    const rest = d.layers.filter(l => !isSig(l));
+    rest.splice(Math.min(at, rest.length), 0, ...signatureLayers(adSigY() / H, AD_INSET, AD_SIG));
+    d.layers = rest; done = true;
+  });
+  return done;
+}
+async function enlargeAdSigs() {
+  const ads = covers.filter(c => c.doc && c.doc.ad && (c.doc.layers || []).some(l => l.role === 'sig'));
+  if (ads.length) {
+    if (!(await adFontsReady())) return;   // measured against the loaded marks and Fraunces, or not at all
+    await preloadAssets(['rtsMark', 'rtsShinbukan', 'rtsSeizanji']);
+    if (!['rtsMark', 'rtsShinbukan', 'rtsSeizanji'].every(id => { const im = getImg(id); return im && im.naturalWidth; })) return;
+    const changed = ads.filter(c => enlargeAdSig(c.doc));
+    if (changed.length) await store.saveCovers(changed);
+  }
+  settings.adSig = AD_SIG; await store.saveSettings(settings).catch(() => {});
+}
 function adLayers(o) {
   const layout = o.layout || 'cover', left = layout === 'split';
   const align = left ? 'left' : 'center', ax = left ? AD_INSET / W : 0.5, span = (W - 2 * AD_INSET) / W;
@@ -3078,7 +3115,7 @@ function adLayers(o) {
   const line = o.line ? mk({ role: 'line', text: o.line, weight: 400, italic: true, size: 21, track: 0, line: 1.35, width: Math.min(0.74, span), color: '#cfc8bb', shadow: 0.3 }) : null;
   if (line) line.width = balancedWidth(line);
   const cta = o.cta ? mk({ role: 'cta', text: o.cta, weight: 600, size: 16, track: 0.2, line: 1.2, width: span, upper: true, shadow: 0 }) : null;
-  const gap = 18, btnH = 53, sig = sigExtent(), sy = H - AD_INSET - sig.down;
+  const gap = 18, btnH = 53, sig = sigExtent(AD_SIG), sy = adSigY();
   const floor = sy - sig.up - (left ? 50 : layout === 'graphic' || layout === 'type' ? 70 : 40);
   const kH = kicker ? measureLayer(kicker).height : 0, sH = sub ? measureLayer(sub).height : 0, lH = line ? measureLayer(line).height : 0;
   let hH, total, y;
@@ -3107,7 +3144,7 @@ function adLayers(o) {
     L.push(newRule({ role: 'button', x: left ? ax + bw / 2 / W : 0.5, y: yc / H, width: bw / W, thick: btnH, color: RTS.red, alpha: 1 }));
     cta.y = (yc - cta.size * cta.line / 2) / H; L.push(cta);
   }
-  L.push(...signatureLayers(sy / H, AD_INSET));
+  L.push(...signatureLayers(sy / H, AD_INSET, AD_SIG));
   return L;
 }
 /* Lay a board out again with the current adLayers, from the copy it carries: edited words, part
@@ -3366,6 +3403,7 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   if (settings.postSet !== POST_SET) { try { await seedPostSet(); } catch (e) { console.warn('post set', e); } }
   if (settings.adSet !== AD_SET || settings.adLayout !== AD_LAYOUT) { try { await seedAdSet(); } catch (e) { console.warn('ad set', e); } }
   if (settings.adLines !== 2) { try { await fixAdLines(); } catch (e) { console.warn('ad lines', e); } }
+  if (settings.adSig !== AD_SIG) { try { await enlargeAdSigs(); } catch (e) { console.warn('ad footer', e); } }
   const todo = location.hash === '#todo';
   if (todo && settings.reelSet !== REEL_SET) { try { await seedReelSet(); } catch (e) { console.warn('reel set', e); } }
   if (settings.demoView !== DEMO_VIEW) { settings.shape = '34'; settings.demoView = DEMO_VIEW; store.saveSettings(settings).catch(() => {}); }
