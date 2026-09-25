@@ -149,6 +149,8 @@ aside.right{border-left:1px solid var(--line)}
 #postEmpty,#adEmpty{color:var(--muted);font-size:13px;padding:30px 4px}
 /* Static ads: the same cards, 4:5 tiles, a sign-off flag and the variant buttons under a board */
 .pslide .cap .flag{display:block;margin-top:3px;color:#e3947c}
+.pslide .cap .dir{display:block;margin-top:3px;font-style:italic}
+#ctaList .chip{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pslide .vars{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
 .pslide .vars button{padding:2px 7px;font-size:10px}
 /* photo library — a single row until it is opened */
@@ -557,6 +559,15 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
       </span></h3>
       <div class="chips" id="blockList"></div>
       <div class="empty" style="font-style:normal">Click a block to paste it onto this cover. Every piece lands as an ordinary layer you can move or edit.</div>
+    </div>
+
+    <div class="sec" id="secCtas">
+      <h3>CTA badges</h3>
+      <div class="chips" id="ctaList"></div>
+      <div class="row" style="align-items:flex-start"><label for="ctaLine">Line</label><div class="ctl"><textarea id="ctaLine" rows="2" style="min-height:52px" placeholder="Helping people step out of old patterns…"></textarea></div></div>
+      <div class="row"><label for="ctaBtn">Button</label><div class="ctl"><input type="text" id="ctaBtn" placeholder="Leave empty for no button"></div></div>
+      <div class="row"><label></label><div class="ctl"><button class="small" id="ctaAdd">Add to this cover</button><button class="small ghost" id="ctaSave">Save as badge</button></div></div>
+      <div class="empty" style="font-style:normal">Click a badge to put its line and button on this cover. On a static ad it takes the place of the board's own CTA; anywhere else it lands as ordinary layers. Edit the line or button above to add your own, or save it as a badge for next time.</div>
     </div>
 
     <div class="sec" id="secLayers">
