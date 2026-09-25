@@ -127,6 +127,21 @@ button. **Save as block** keeps the open cover's layers — or only the selected
 block of your own, so a lock-up built once on any cover can be pasted onto every other one.
 Own blocks live in that browser's settings; every paste is ordinary layers and one undo step.
 
+**CTA badges** — one click puts a call to action on the open cover: a positioning line and,
+if it has one, a button. The eight CTA lines from Harrison's static ad brief are built in
+(`ads.js`, `ctas`), each with the *See how the 12 weeks work* button. Type a different line or
+button in the fields under the badges to use your own, and **Save as badge** keeps it for every
+cover in that browser. On a static ad a badge replaces the board's own footer line and button and
+lays the board out again inside the safe box; on anything else it lands as ordinary layers near
+the foot. Either way it is one undo step.
+
+**Static Set v3 — nine angles** — the nine headline-led angles from the static ad copy bank
+(25 Sep 2026), boards A5.1–A5.9 on the Static Ads tab, each on an unused Day 1 still (A5.9 on the
+type plate, as the brief asks for a quiet visual) with the CTA line that matches its angle as a
+small footer. The copy lives on the boards in `ads.js`, and the brief's art direction is printed
+under each tile. Headlines are in sentence case like the other sets; **CAPS** on the headline
+layer sets them the way the brief has them.
+
 **Reel to-do set** — the working queue for re-covering the live reels. Open the link ending
 `#todo` once and that browser is given one cover for each reel whose cover can still be
 swapped after publishing (`reels.js`, from the updater's manifest: 55 reels plus #51, which

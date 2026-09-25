@@ -2611,6 +2611,76 @@ function bindBlocks() {
   renderBlocks();
 }
 
+/* ---------------- CTA badges ----------------
+   One-click CTAs: a positioning line and, optionally, a button. The eight lines from
+   Harrison's static ad brief are built in (ads.js); badges saved from the Line and
+   Button fields live in this browser's settings. On a static ad a badge replaces the
+   board's footer line and button and lays the board out again, so the stack stays in
+   the safe box; on anything else it lands as ordinary layers near the foot. */
+const builtinCtas = () => (rtsAds().ctas || []).map(c => ({ ...c, name: c.id, builtin: true }));
+function ctaBadgeLayers(line, button) {
+  const mk = p => newText(Object.assign({ font: RTS.font, align: 'center', x: 0.5, color: RTS.white, box: 'none', outline: 0, shadow: 0.3, behind: false }, p));
+  const L = [], btnH = 54, gap = 26;
+  const t = line ? mk({ text: line, weight: 400, size: 24, track: 0.01, line: 1.35, width: 0.74, color: '#e6dfd2', shadow: 0.5 }) : null;
+  const b = button ? mk({ text: button, weight: 600, size: 17, track: 0.2, line: 1.2, width: 0.86, upper: true, shadow: 0 }) : null;
+  if (t) t.width = balancedWidth(t);
+  const tH = t ? measureLayer(t).height : 0;
+  // foot of the stack: above the reel UI on a cover, above the signature strip on a 4:5 or square frame
+  let y = (H > 1600 ? 0.8 : 0.84) * H - tH - (b ? gap + btnH : 0);
+  if (t) { t.y = y / H; L.push(t); y += tH + gap; }
+  if (b) {
+    const c = measureCtx(); c.font = fontString(b); c.letterSpacing = `${b.track * b.size}px`;
+    const bw = c.measureText(button.toUpperCase()).width + 64, yc = y + btnH / 2;
+    b.y = (yc - b.size * b.line / 2) / H;
+    L.push(newRule({ x: 0.5, y: yc / H, width: bw / W, thick: btnH, color: RTS.red, alpha: 1 }), b);
+  }
+  return L;
+}
+async function placeCta(name, line, button) {
+  line = (line || '').trim(); button = (button || '').trim();
+  if (!line && !button) return toast('Write a line or a button first');
+  await loadAdFonts();
+  if (doc.ad) {
+    pushUndo();
+    relayAd(doc, { line, cta: button });
+    const l = doc.layers.find(x => x.role === 'line') || doc.layers.find(x => x.role === 'cta');
+    if (l) select(l.id);
+    commit(); syncAll(); renderAds();
+    return toast(`${name} set on ${doc.ad.id}`);
+  }
+  pasteBlock(name, withSize(doc, () => ctaBadgeLayers(line, button)));
+}
+function renderCtas() {
+  const c = $('#ctaList'); if (!c) return; c.innerHTML = '';
+  const add = (b, own) => {
+    const el = document.createElement('button'); el.className = 'chip'; el.type = 'button';
+    el.title = `${b.line}${b.button ? `\n[ ${b.button} ]` : ''}\n\nClick to put it on this cover`;
+    el.append(own ? b.name + ' ' : b.name);
+    if (own) {
+      el.style.borderColor = 'var(--accent)';
+      const x = document.createElement('span'); x.textContent = '✕'; x.title = 'Delete this badge'; x.style.opacity = '.6';
+      x.onclick = e => { e.stopPropagation(); if (!confirm(`Delete the CTA badge “${b.name}”?`)) return; settings.ctaBadges = settings.ctaBadges.filter(o => o.id !== b.id); saveSettingsSoon(); renderCtas(); };
+      el.appendChild(x);
+    }
+    el.onclick = () => { $('#ctaLine').value = b.line || ''; $('#ctaBtn').value = b.button || ''; placeCta(b.name, b.line, b.button); };
+    c.appendChild(el);
+  };
+  builtinCtas().forEach(b => add(b, false));
+  (settings.ctaBadges || []).forEach(b => add(b, true));
+}
+function bindCtas() {
+  $('#ctaAdd').onclick = () => placeCta('CTA', $('#ctaLine').value, $('#ctaBtn').value);
+  $('#ctaSave').onclick = () => {
+    const line = $('#ctaLine').value.trim(), button = $('#ctaBtn').value.trim();
+    if (!line && !button) return toast('Write a line or a button first');
+    const name = (prompt('Name this CTA badge:', (line || button).split(/\s+/).slice(0, 4).join(' ')) || '').trim();
+    if (!name) return;
+    settings.ctaBadges = [...(settings.ctaBadges || []), { id: uid(), name, line, button }];
+    saveSettingsSoon(); renderCtas(); toast(`Saved “${name}” — it is in CTA badges on every cover`);
+  };
+  renderCtas();
+}
+
 /* ---------------- reel to-do set ----------------
    The working queue for re-covering the live reels: one cover for each reel whose
    cover can still be swapped (reels.js, from the updater's manifest), carrying its
@@ -2961,12 +3031,14 @@ $('#btnExportCarousels').onclick = () => exportAllCarousels();
    Copy comes from statics.js, plates and sets from ads.js; seedAdSet builds each
    board once at 1080×1350 and never rebuilds one that is already there. A square
    or story variant is a second document with the same copy on a new frame. */
-const AD_SET = 'rts-ads-v1';
+const AD_SET = 'rts-ads-v2';   // v2: adds Static Set v3, the nine angles (25 Sep 2026)
 const AD_LAYOUT = 2;   // adLayers revision: 2 = inside the safe box, sentence-case regular headline (25 Sep 2026)
 const AD_FRAMES = { '4x5': { w: 1080, h: 1350, label: 'Feed 4:5' }, '1x1': { w: 1080, h: 1080, label: 'Square 1:1' }, '9x16': { w: 1080, h: 1920, label: 'Story 9:16' } };
 const rtsAds = () => window.__RTS_ADS__ || { sets: [], plates: [] };
 const staticById = id => (window.__RTS_STATICS__ || []).find(s => s.id === id) || {};
 const adBoardCfg = (setKey, id) => ((rtsAds().sets.find(s => s.key === setKey) || {}).boards || []).find(b => b.id === id);
+/* A board's source copy: statics.js by id, overlaid by the words a board carries in ads.js (v3 has no statics entry). */
+const adSource = (setKey, id) => ({ ...staticById(id), ...((adBoardCfg(setKey, id) || {}).copy || {}) });
 function loadAdFonts() {
   return Promise.allSettled(['400 100px "Fraunces"', '500 100px "Fraunces"', '600 100px "Fraunces"', 'italic 400 100px "Fraunces"'].map(f => document.fonts.load(f)));
 }
@@ -2995,14 +3067,17 @@ function adLayers(o) {
   const head = mk({ role: 'head', text: o.head || '', weight: 400, size: adHeadSize(o.head, layout), track: layout === 'type' ? -0.015 : -0.008, line: 1.02, width: span, upper: false });
   head.width = balancedWidth(head);
   const sub = o.sub ? mk({ role: 'sub', text: o.sub, weight: 400, italic: true, size: 25, track: 0, line: 1.3, width: Math.min(0.704, span), color: '#f1ece2', shadow: 0.3 }) : null;
+  // the CTA / positioning line: a quiet footer under the sub-line, above the button
+  const line = o.line ? mk({ role: 'line', text: o.line, weight: 400, size: 21, track: 0.01, line: 1.35, width: Math.min(0.74, span), color: '#cfc8bb', shadow: 0.3 }) : null;
+  if (line) line.width = balancedWidth(line);
   const cta = o.cta ? mk({ role: 'cta', text: o.cta, weight: 600, size: 16, track: 0.2, line: 1.2, width: span, upper: true, shadow: 0 }) : null;
   const gap = 18, btnH = 53, sig = sigExtent(), sy = H - AD_INSET - sig.down;
   const floor = sy - sig.up - (left ? 50 : layout === 'graphic' || layout === 'type' ? 70 : 40);
-  const kH = kicker ? measureLayer(kicker).height : 0, sH = sub ? measureLayer(sub).height : 0;
+  const kH = kicker ? measureLayer(kicker).height : 0, sH = sub ? measureLayer(sub).height : 0, lH = line ? measureLayer(line).height : 0;
   let hH, total, y;
   for (;;) {
     hH = measureLayer(head).height;
-    total = (kicker ? kH + gap : 0) + hH + gap + 3 + gap + sH + 4 + (cta ? 8 + gap + btnH : 0);
+    total = (kicker ? kH + gap : 0) + hH + gap + 3 + gap + sH + 4 + (line ? gap + lH : 0) + (cta ? 8 + gap + btnH : 0);
     y = floor - total;
     if (y >= AD_INSET || head.size <= 36) break;
     head.size -= 4; head.width = balancedWidth({ ...head, width: span });
@@ -3017,6 +3092,7 @@ function adLayers(o) {
   head.y = y / H; L.push(head); y += hH + gap;
   L.push(newRule({ role: 'rule', x: left ? ax + 22 / W : 0.5, y: (y + 1.5) / H, width: 44 / W, thick: 3, color: RTS.red, alpha: 1 })); y += 3 + gap;
   if (sub) { sub.y = y / H; L.push(sub); } y += sH + 4;
+  if (line) { y += sub ? gap : 0; line.y = y / H; L.push(line); y += lH + (sub ? 0 : gap); }
   if (cta) {
     y += 8 + gap;
     const x = measureCtx(); x.font = fontString(cta); x.letterSpacing = `${cta.track * cta.size}px`;
@@ -3030,13 +3106,13 @@ function adLayers(o) {
 /* Lay a board out again with the current adLayers, from the copy it carries: edited words, part
    colour and gradients stay; positions, sizes and weights follow the layout; layers added by hand
    (no role, not the signature strip) are kept on top. */
-function relayAd(d) {
+function relayAd(d, over) {
   withSize(d, () => {
-    const copy = adCopyOf(d), old = d.layers || [];
+    const copy = { ...adCopyOf(d), ...over }, old = d.layers || [];
     const isSig = l => l.role === 'sig' || (l.type === 'logo' && ['rtsMark', 'rtsShinbukan', 'rtsSeizanji'].includes(l.image))
       || (l.type === 'text' && !l.role && ['Harrison Saito', 'Educator. Martial Artist. Coach.'].includes(l.text));
     const own = old.filter(l => !l.role && !isSig(l));
-    const fresh = adLayers({ layout: d.ad.layout, kicker: copy.kicker, head: copy.head, sub: copy.sub, cta: copy.cta });
+    const fresh = adLayers({ ...copy, layout: d.ad.layout });
     for (const l of fresh) {
       if (l.type !== 'text' || !l.role) continue;
       const o = old.find(x => x.type === 'text' && x.role === l.role); if (!o) continue;
@@ -3049,11 +3125,11 @@ function relayAd(d) {
 }
 /* The copy a board carries now — its edited layers first, statics.js as the fallback. */
 function adCopyOf(d) {
-  const s = staticById(d.ad.id), role = r => { const l = d.layers.find(x => x.type === 'text' && x.role === r); return l ? l.text : undefined; };
+  const s = adSource(d.ad.setKey, d.ad.id), role = r => { const l = d.layers.find(x => x.type === 'text' && x.role === r); return l ? l.text : undefined; };
   const pick = (r, f) => { const v = role(r); return v === undefined ? (f || '') : v; };
-  return { name: d.ad.name, kicker: pick('kicker', s.kicker), head: pick('head', s.head), sub: pick('sub', s.sub), cta: pick('cta', s.cta) };
+  return { name: d.ad.name, kicker: pick('kicker', s.kicker), head: pick('head', s.head), sub: pick('sub', s.sub), line: pick('line', s.line), cta: pick('cta', s.cta) };
 }
-/* b: the board (bg, tall, scrim, layout, flag, pair) · frame: a key of AD_FRAMES · copy: kicker/head/sub/cta/name */
+/* b: the board (bg, tall, scrim, layout, flag, pair, ctaRef, dir) · frame: a key of AD_FRAMES · copy: kicker/head/sub/line/cta/name */
 function adDoc(set, b, frame, copy) {
   const fr = AD_FRAMES[frame] || AD_FRAMES['4x5'];
   const d = baseDoc(`Static ${b.id} · ${copy.name || b.id}`);
@@ -3067,8 +3143,8 @@ function adDoc(set, b, frame, copy) {
   const y = b.anchor && slack > 0 ? (b.anchor === 'bottom' ? -1 : 1) * slack / Math.max(slack, fr.h * .25) : 0;
   d.bg = { ...d.bg, type: 'image', image: b.bg, fit: 'fill', scale: 1, x: 0, y, blur: 0, bright: 1, sat: 1, pad: RTS.ink };
   d.overlay = { type: b.scrim ? 'scrim' : 'none', color: '#0c0905', opacity: b.scrim || 0 };
-  d.layers = withSize(fr, () => adLayers({ layout: b.layout, kicker: copy.kicker, head: copy.head, sub: copy.sub, cta: copy.cta }));
-  d.ad = { set: AD_SET, rev: AD_LAYOUT, key: `${set.key}:${b.id}:${frame}`, setKey: set.key, id: b.id, name: copy.name || b.id, layout: b.layout || 'cover', frame, ver: set.ver || '01', flag: b.flag || '', pair: b.pair || '' };
+  d.layers = withSize(fr, () => adLayers({ ...copy, layout: b.layout }));
+  d.ad = { set: AD_SET, rev: AD_LAYOUT, key: `${set.key}:${b.id}:${frame}`, setKey: set.key, id: b.id, name: copy.name || b.id, layout: b.layout || 'cover', frame, ver: set.ver || '01', flag: b.flag || '', pair: b.pair || '', ctaRef: b.ctaRef || '', dir: b.dir || '' };
   return d;
 }
 async function seedAdSet() {
@@ -3086,8 +3162,8 @@ async function seedAdSet() {
   const recs = [];
   for (const set of cfg.sets) for (const b of set.boards) {
     if (have.has(`${set.key}:${b.id}:4x5`)) continue;          // an edited board is never rebuilt
-    const s = staticById(b.id);
-    const d = adDoc(set, { layout: s.layout || 'cover', ...b }, '4x5', { name: s.name || b.id, kicker: s.kicker, head: s.head, sub: s.sub, cta: s.cta });
+    const s = adSource(set.key, b.id);
+    const d = adDoc(set, { layout: s.layout || 'cover', ...b }, '4x5', { name: s.name || b.id, kicker: s.kicker, head: s.head, sub: s.sub, line: s.line, cta: s.cta });
     d.createdAt = d.updatedAt = t++; recs.push(coverRecord(d));
   }
   if (recs.length) { await store.saveCovers(recs); covers = covers.concat(recs); }
@@ -3162,7 +3238,8 @@ function adTile(r, have) {
   const no = document.createElement('span'); no.className = 'no'; no.textContent = a.frame === '4x5' ? a.id : `${a.id} · ${a.frame.replace('x', ':')}`; b.appendChild(no);
   b.onclick = () => { loadDoc(live); switchView('editor'); };
   const cap = document.createElement('div'); cap.className = 'cap';
-  cap.innerHTML = `<b>${escapeHtml(fr.label)}${a.pair ? ' · with ' + escapeHtml(a.pair) : ''}</b>${escapeHtml(a.name)}`
+  cap.innerHTML = `<b>${escapeHtml(fr.label)}${a.pair ? ' · with ' + escapeHtml(a.pair) : ''}${a.ctaRef ? ' · ' + escapeHtml(a.ctaRef) : ''}</b>${escapeHtml(a.name)}`
+    + (a.dir ? `<span class="dir">${escapeHtml(a.dir)}</span>` : '')
     + (a.flag ? `<span class="flag">~ ${escapeHtml(a.flag)}</span>` : '');
   el.append(b, cap);
   if (a.frame === '4x5') {
@@ -3216,7 +3293,7 @@ async function addAdVariant(r, frame) {
   const anchor = ratio <= fr.h / fr.w + 0.01 ? '' : src.bg.image === cfg.bg && cfg.anchor ? cfg.anchor : ratio > 1.7 ? (src.bg.y < 0 ? 'bottom' : 'top') : 'top';
   const scrim = src.overlay && src.overlay.type === 'scrim' ? src.overlay.opacity : 0;
   await loadAdFonts();
-  const d = adDoc(set, { ...cfg, id: a.id, layout: a.layout, flag: a.flag, pair: a.pair, bg: src.bg.image, anchor, scrim }, frame, adCopyOf(src));
+  const d = adDoc(set, { ...cfg, id: a.id, layout: a.layout, flag: a.flag, pair: a.pair, ctaRef: a.ctaRef, dir: a.dir, bg: src.bg.image, anchor, scrim }, frame, adCopyOf(src));
   d.bg = { ...d.bg, bright: src.bg.bright, sat: src.bg.sat, blur: src.bg.blur };
   d.createdAt = d.updatedAt = Date.now();
   const rec = coverRecord(d); covers.push(rec); await store.saveCovers([rec]);
@@ -3261,7 +3338,7 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
     settings.profileEdited = true;
   } catch {}
   try { covers = await store.listCovers(); } catch (e) { console.warn(e); covers = []; }
-  refreshAssetSelects(); renderTemplates(); bindBatch(); bindMosaic(); bindSpan(); bindBlocks();
+  refreshAssetSelects(); renderTemplates(); bindBatch(); bindMosaic(); bindSpan(); bindBlocks(); bindCtas();
   batchOpts.pool = assetsOf('photo').filter(p => p.still).map(p => p.id);
   let seeded = false;
   if (settings.demoSet !== DEMO_SET) { try { seeded = await seedDemoSet(); } catch (e) { console.warn('demo set', e); } }
