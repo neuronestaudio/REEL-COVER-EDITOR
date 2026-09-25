@@ -4,3 +4,4 @@ node_modules
 *.log
 .env.local
 .env*.local
+_upload_pd3.mjs

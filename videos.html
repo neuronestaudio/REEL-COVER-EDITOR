@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Return to Self · Video library</title>
+<meta name="description" content="Every clip from the Return to Self shoots, hosted and searchable: play, copy a link, download. The VSL cuts sit on top.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{--ink:#14120e;--ink2:#1c1913;--ink3:#26221a;--line:#332e25;--paper:#fbf7ef;--soft:#cfc8bb;--mute:#8f887a;--red:#b5432f;--red2:#d0573f}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--ink);color:var(--paper);font:15px/1.5 Manrope,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+h1,h2,h3{font-family:Fraunces,Georgia,serif;font-weight:500;margin:0;letter-spacing:-.01em}
+.wrap{max-width:1380px;margin:0 auto;padding:0 20px}
+header.top{padding:34px 0 18px;border-bottom:1px solid var(--line)}
+.kicker{font:600 11px/1.2 Manrope,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--soft)}
+header.top h1{font-size:clamp(30px,4.2vw,46px);margin:8px 0 6px}
+header.top p{margin:0;color:var(--mute);max-width:720px}
+header.top .drive{margin-top:10px;font-size:13px;color:var(--soft)}
+.rule{width:44px;height:3px;background:var(--red);margin:14px 0 0}
+section{padding:26px 0}
+section h2{font-size:24px;margin-bottom:14px}
+.vsl{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
+.film{background:var(--ink2);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.film video{width:100%;aspect-ratio:16/9;background:#000;display:block}
+.film .b{padding:14px 16px 16px}
+.film h3{font-size:20px}
+.film p{margin:6px 0 10px;color:var(--mute);font-size:13.5px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{appearance:none;border:1px solid var(--line);background:var(--ink3);color:var(--paper);border-radius:999px;padding:7px 13px;font:600 12.5px/1 Manrope,sans-serif;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--soft)}
+.btn.red{background:var(--red);border-color:var(--red)}
+.btn.red:hover{background:var(--red2)}
+.btn.small{padding:5px 10px;font-size:11.5px}
+.tools{position:sticky;top:0;z-index:5;background:linear-gradient(var(--ink) 80%,transparent);padding:14px 0 12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.tools input[type=search]{flex:1 1 280px;min-width:200px;background:var(--ink2);border:1px solid var(--line);color:var(--paper);border-radius:999px;padding:10px 16px;font:15px Manrope,sans-serif;outline:none}
+.tools input[type=search]:focus{border-color:var(--soft)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{appearance:none;border:0;background:transparent;color:var(--soft);padding:8px 13px;font:600 12px Manrope,sans-serif;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--paper);color:var(--ink)}
+.count{color:var(--mute);font-size:13px;margin-left:auto;font-family:JetBrains Mono,monospace}
+.topics{display:flex;flex-wrap:wrap;gap:7px;margin:4px 0 18px}
+.chip{appearance:none;border:1px solid var(--line);background:transparent;color:var(--soft);border-radius:999px;padding:6px 11px;font:500 12px Manrope,sans-serif;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--red);border-color:var(--red);color:#fff}
+.chip i{font-style:normal;opacity:.6;margin-left:5px;font-family:JetBrains Mono,monospace;font-size:11px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.card{background:var(--ink2);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer;transition:border-color .15s}
+.card:hover{border-color:var(--soft)}
+.card .th{position:relative;aspect-ratio:16/9;background:#0b0a07;overflow:hidden}
+.card .th img{width:100%;height:100%;object-fit:cover;display:block;opacity:.92}
+.card .th .dur{position:absolute;right:8px;bottom:8px;background:rgba(10,8,5,.8);color:var(--paper);font:500 11px JetBrains Mono,monospace;padding:3px 7px;border-radius:6px}
+.card .th .fmt{position:absolute;left:8px;top:8px;display:flex;gap:4px}
+.card .th .fmt span{background:rgba(10,8,5,.75);color:var(--soft);font:600 10px Manrope,sans-serif;padding:3px 6px;border-radius:5px;letter-spacing:.06em}
+.card .th .g{position:absolute;right:8px;top:8px;background:rgba(10,8,5,.75);color:var(--soft);font:700 10px Manrope,sans-serif;padding:3px 6px;border-radius:5px}
+.card .b{padding:11px 13px 13px;display:flex;flex-direction:column;gap:6px;flex:1}
+.card .t{font:600 11px Manrope,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.card .x{font:15px/1.4 Fraunces,Georgia,serif;color:var(--paper);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card .m{font:11.5px JetBrains Mono,monospace;color:var(--mute);margin-top:auto}
+.empty{color:var(--mute);padding:30px 0}
+dialog{border:0;padding:0;background:transparent;max-width:min(1100px,96vw);width:100%}
+dialog::backdrop{background:rgba(6,5,3,.86)}
+.modal{background:var(--ink2);border:1px solid var(--line);border-radius:14px;overflow:hidden;color:var(--paper)}
+.modal .v{background:#000;display:flex;justify-content:center}
+.modal video{max-height:66vh;width:100%;display:block;background:#000}
+.modal video.tall{width:auto;aspect-ratio:9/16}
+.modal .b{padding:16px 18px 18px}
+.modal h3{font-size:22px;margin-bottom:6px}
+.modal .meta{font:12px JetBrains Mono,monospace;color:var(--mute);margin-bottom:10px}
+.modal .tx{font:16px/1.55 Fraunces,Georgia,serif;color:var(--paper);max-height:26vh;overflow:auto;padding-right:6px;margin-bottom:14px}
+.modal .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.play{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;background:rgba(20,18,14,.72);border:1px solid rgba(251,247,239,.35)}
+.play::after{content:"";position:absolute;left:26px;top:20px;border-left:18px solid #fbf7ef;border-top:12px solid transparent;border-bottom:12px solid transparent}
+.pv:hover .play{background:var(--red)}
+.sync{position:absolute;left:12px;bottom:12px;background:rgba(20,18,14,.8);color:var(--soft);font:600 12px Manrope,sans-serif;padding:6px 10px;border-radius:999px}
+.modal .close{position:absolute;right:10px;top:10px;background:rgba(10,8,5,.7);border:0;color:#fff;font-size:20px;width:36px;height:36px;border-radius:50%;cursor:pointer}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--paper);color:var(--ink);padding:9px 14px;border-radius:999px;font:600 13px Manrope,sans-serif;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
+.toast.on{opacity:1}
+footer{padding:30px 0 40px;color:var(--mute);font-size:12.5px;border-top:1px solid var(--line);margin-top:20px}
+@media (max-width:640px){.count{margin-left:0}header.top{padding-top:24px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="kicker">Return to Self · Harrison Saito</div>
+    <h1>Video library</h1>
+    <p id="lede">Every clip from the shoot, in one place: play it here, copy its link, download it for an ad or a page. Search finds the words he said. The files live on the shared drive, so be signed in to Google to play them.</p>
+    <div class="rule"></div>
+    <div class="drive" id="driveLine"></div>
+  </header>
+
+  <section id="vslSec" hidden>
+    <h2>The VSL</h2>
+    <div class="vsl" id="vsl"></div>
+  </section>
+
+  <section>
+    <h2>Clips</h2>
+    <div class="tools">
+      <input type="search" id="q" placeholder="Search what he says… e.g. father, enough, burnout" autocomplete="off">
+      <div class="seg" id="fmt"><button aria-pressed="true" data-v="all">All</button><button aria-pressed="false" data-v="16x9">16:9</button><button aria-pressed="false" data-v="9x16">9:16 vertical</button></div>
+      <div class="seg" id="grade"><button aria-pressed="true" data-v="all">A + B</button><button aria-pressed="false" data-v="A">A only</button></div>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="topics" id="topics"></div>
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="empty" hidden>Nothing matches. Try fewer words.</div>
+  </section>
+
+  <footer id="foot"></footer>
+</div>
+
+<dialog id="dlg"><div class="modal" style="position:relative">
+  <button class="close" id="dlgClose" aria-label="Close">×</button>
+  <div class="v" id="dvWrap"></div>
+  <div class="b">
+    <h3 id="dt"></h3>
+    <div class="meta" id="dm"></div>
+    <div class="tx" id="dx"></div>
+    <div class="row" id="dr"></div>
+  </div>
+</div></dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+(async () => {
+  const $ = s => document.querySelector(s), esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const fmtDur = s => { s = Math.round(s || 0); return (s >= 60 ? Math.floor(s / 60) + ':' : '0:') + String(s % 60).padStart(2, '0'); };
+  const fmtMB = b => b ? (b / 1e6).toFixed(b > 1e8 ? 0 : 1) + ' MB' : '';
+  const tc = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = Math.floor(s % 60), f = Math.round((s % 1) * 25); return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(x).padStart(2,'0')}:${String(f).padStart(2,'0')}`; };
+  let toastT; const toast = m => { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 1600); };
+  const copy = async (text, what) => { try { await navigator.clipboard.writeText(text); toast((what || 'Link') + ' copied'); } catch { prompt('Copy:', text); } };
+  const dv_ = id => `https://drive.google.com/file/d/${id}/view`, dl_ = id => `https://drive.google.com/uc?export=download&id=${id}`, pv_ = id => `https://drive.google.com/file/d/${id}/preview`;
+
+  let man;
+  try { man = await (await fetch('videos.json?' + Date.now())).json(); } catch (e) { $('#grid').innerHTML = '<div class="empty">The library manifest could not be loaded.</div>'; return; }
+  document.title = man.title || document.title;
+  if (man.drive) $('#driveLine').innerHTML = `${esc(man.shoot || '')} · <a href="${esc(man.drive)}" target="_blank" rel="noopener">the shoot folder on the shared drive</a>`;
+  $('#foot').textContent = `${man.clips.length} takes · ${man.clips.reduce((n, c) => n + Object.keys(c.formats).length, 0)} files · built ${man.built}. Every link points at the file on the shared drive: Copy link shares it, Download saves the MP4 for an ad or a page.`;
+
+  // ---- the VSL cuts
+  if (man.vsl && man.vsl.length) {
+    $('#vslSec').hidden = false;
+    $('#vsl').innerHTML = man.vsl.map((v, i) => `
+      <div class="film">
+        ${v.captioned || v.clean
+          ? `<div class="pv" data-id="${esc(v.captioned || v.clean)}" style="position:relative;aspect-ratio:16/9;background:#000 url('${esc(v.poster || '')}') center/cover;cursor:pointer"><span class="play"></span></div>`
+          : `<div style="aspect-ratio:16/9;background:#000 url('${esc(v.poster || '')}') center/cover;position:relative"><span class="sync">Uploading to the drive — back shortly</span></div>`}
+        <div class="b">
+          <h3>${esc(v.label)}</h3>
+          <p>${esc(v.note || '')}${v.dur ? ` · ${fmtDur(v.dur)}` : ''}</p>
+          <div class="btns">
+            ${v.captioned ? `<button class="btn red" data-copy="${dv_(v.captioned)}">Copy link · captioned</button><a class="btn" href="${dl_(v.captioned)}" target="_blank" rel="noopener">Download captioned</a>` : ''}
+            ${v.clean ? `<button class="btn" data-copy="${dv_(v.clean)}">Copy link · clean</button><a class="btn" href="${dl_(v.clean)}" target="_blank" rel="noopener">Download clean</a>` : ''}
+            ${Object.entries(v.files || {}).map(([k, id]) => `<a class="btn small" href="${dl_(id)}" target="_blank" rel="noopener">${k.toUpperCase()}</a>`).join('')}
+            ${man.folders && man.folders.vsl ? `<a class="btn small" href="${esc(man.folders.vsl)}" target="_blank" rel="noopener">Folder on the drive</a>` : ''}
+          </div>
+        </div>
+      </div>`).join('');
+    $('#vsl').addEventListener('click', e => { const p = e.target.closest('.pv'); if (!p) return; p.innerHTML = `<iframe src="${pv_(p.dataset.id)}" allow="autoplay; fullscreen" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>`; p.style.cursor = 'default'; });
+  }
+
+  // ---- the clips
+  const state = { q: '', fmt: 'all', grade: 'all', topic: '' };
+  const topicCount = t => man.clips.filter(c => c.topic === t).length;
+  $('#topics').innerHTML = `<button class="chip" aria-pressed="true" data-t="">All topics<i>${man.clips.length}</i></button>` +
+    man.topics.map(t => `<button class="chip" aria-pressed="false" data-t="${esc(t)}">${esc(t.replace(/^\d+ /, ''))}<i>${topicCount(t)}</i></button>`).join('');
+  const seg = (id, key) => $(id).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; [...$(id).children].forEach(x => x.setAttribute('aria-pressed', x === b)); state[key] = b.dataset.v; draw(); });
+  seg('#fmt', 'fmt'); seg('#grade', 'grade');
+  $('#topics').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; [...$('#topics').children].forEach(x => x.setAttribute('aria-pressed', x === b)); state.topic = b.dataset.t; draw(); });
+  $('#q').addEventListener('input', () => { state.q = $('#q').value.trim().toLowerCase(); draw(); });
+
+  const visible = () => man.clips.filter(c => (state.fmt === 'all' || c.formats[state.fmt]) && (state.grade === 'all' || c.grade === state.grade)
+    && (!state.topic || c.topic === state.topic) && (!state.q || (c.text + ' ' + c.take + ' ' + c.topic).toLowerCase().includes(state.q)));
+  function draw() {
+    const list = visible();
+    $('#count').textContent = `${list.length} of ${man.clips.length}`;
+    $('#empty').hidden = list.length > 0;
+    $('#grid').innerHTML = list.map(c => {
+      const f = c.formats[state.fmt === '9x16' ? '9x16' : '16x9'] || c.formats['9x16'];
+      return `<div class="card" data-take="${esc(c.take)}">
+        <div class="th"><img loading="lazy" src="${esc(f.poster || '')}" alt="">
+          <div class="fmt">${Object.keys(c.formats).map(k => `<span>${k.replace('x', ':')}</span>`).join('')}</div>
+          <div class="g">${esc(c.grade)}</div><div class="dur">${fmtDur(c.dur)}</div></div>
+        <div class="b"><div class="t">${esc(c.topic.replace(/^\d+ /, ''))}</div><div class="x">${esc(c.text)}</div><div class="m">${esc(c.take)} · ${esc(c.src)} ${tc(c.in)}</div></div>
+      </div>`;
+    }).join('');
+  }
+  draw();
+
+  // ---- the player
+  const dlg = $('#dlg'), dvWrap = $('#dvWrap');
+  function open(c, fmt) {
+    fmt = fmt || (c.formats[state.fmt === '9x16' ? '9x16' : '16x9'] ? (state.fmt === '9x16' ? '9x16' : '16x9') : Object.keys(c.formats)[0]);
+    const f = c.formats[fmt];
+    dvWrap.innerHTML = `<iframe src="${pv_(f.id)}" allow="autoplay; fullscreen" allowfullscreen style="border:0;background:#000;${fmt === '9x16' ? 'height:66vh;aspect-ratio:9/16' : 'width:100%;aspect-ratio:16/9;max-height:66vh'}"></iframe>`;
+    $('#dt').textContent = c.topic.replace(/^\d+ /, '');
+    $('#dm').textContent = `${c.take} · ${c.src}.MP4 ${tc(c.in)} → ${tc(c.out)} · ${fmtDur(c.dur)} · grade ${c.grade}${c.framing ? ' · ' + c.framing : ''} · ${fmt.replace('x', ':')} · ${fmtMB(f.size)}`;
+    $('#dx').textContent = c.text;
+    $('#dr').innerHTML = `<button class="btn red" data-copy="${dv_(f.id)}">Copy link</button>
+      <a class="btn" href="${dl_(f.id)}" target="_blank" rel="noopener">Download</a>
+      <a class="btn" href="${dv_(f.id)}" target="_blank" rel="noopener">Open in Drive</a>
+      <button class="btn" data-copytext="1">Copy transcript</button>
+      ${Object.keys(c.formats).filter(k => k !== fmt).map(k => `<button class="btn" data-fmt="${k}">Open ${k.replace('x', ':')}</button>`).join('')}`;
+    $('#dr').onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.copytext) copy(c.text, 'Transcript'); else if (b.dataset.fmt) open(c, b.dataset.fmt); };
+    if (!dlg.open) dlg.showModal();
+    history.replaceState(null, '', '#' + c.take);
+  }
+  $('#grid').addEventListener('click', e => { const el = e.target.closest('.card'); if (!el) return; const c = man.clips.find(x => x.take === el.dataset.take); if (c) open(c); });
+  const shut = () => { dvWrap.innerHTML = ''; dlg.close(); history.replaceState(null, '', location.pathname); };
+  $('#dlgClose').onclick = shut; dlg.addEventListener('click', e => { if (e.target === dlg) shut(); }); dlg.addEventListener('cancel', e => { e.preventDefault(); shut(); });
+  document.addEventListener('click', e => { const b = e.target.closest('[data-copy]'); if (b) copy(b.dataset.copy); });
+  if (location.hash.length > 1) { const c = man.clips.find(x => x.take === location.hash.slice(1)); if (c) open(c); }
+})();
+</script>
+</body>
+</html>
