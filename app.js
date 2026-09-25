@@ -11,6 +11,8 @@ let W = 1080, H = 1920;
 const COVER = { w: 1080, h: 1920 }, POST = { w: 1080, h: 1350 };
 const sizeOf = d => ({ w: (d && d.w) || 1080, h: (d && d.h) || 1920 });
 const isPost = d => !!(d && d.post);
+const isAd = d => !!(d && d.ad);
+const isFeed = d => isPost(d) || isAd(d);   // a feed post or a static ad: never a reel cover
 function withSize(d, fn) {
   const pw = W, ph = H, s = sizeOf(d); W = s.w; H = s.h;
   try { return fn(); } finally { W = pw; H = ph; }
@@ -120,6 +122,7 @@ const BUILTIN = {
    stills, built in so every browser has them. `thumb` is what the library grid loads; the
    full plate is only fetched when a cover uses it. `group` names their library group. */
 for (const p of window.__PEOPLE_PHOTOS__ || []) BUILTIN[p.id] = { id: p.id, kind: 'photo', name: p.name, url: p.url, thumb: p.thumb, group: p.group, builtin: true };
+for (const p of [].concat(window.__DAY1_STILLS__ || [], (window.__RTS_ADS__ || {}).plates || [])) BUILTIN[p.id] = { id: p.id, kind: 'photo', name: p.name, url: p.url, thumb: p.thumb, group: p.group, builtin: true };
 const BUILTIN_NAMES = new Set(Object.values(BUILTIN).map(a => a.name));
 /* A photo someone imported by folder before it was built in: still loaded, because a cover may
    point at it, but kept out of the library so the picture is not listed twice. */
@@ -338,6 +341,8 @@ function drawOverlay(x, doc) {
   if (o.type === 'tint') { x.globalAlpha = o.opacity; x.fillStyle = o.color; x.fillRect(0, 0, W, H); }
   else if (o.type === 'vignette') { const g = x.createRadialGradient(W / 2, H / 2, H * .25, W / 2, H / 2, H * .75); g.addColorStop(0, hexA(o.color, 0)); g.addColorStop(1, hexA(o.color, o.opacity)); x.fillStyle = g; x.fillRect(0, 0, W, H); }
   else {
+    if (o.type === 'scrim') { // the static ads' floor scrim: solid ink at the foot, gone by 64% up
+      const g = x.createLinearGradient(0, H, 0, H * .36); g.addColorStop(0, hexA(o.color, o.opacity)); g.addColorStop(.375, hexA(o.color, o.opacity * .926)); g.addColorStop(.656, hexA(o.color, o.opacity * .63)); g.addColorStop(1, hexA(o.color, 0)); x.fillStyle = g; x.fillRect(0, 0, W, H); }
     if (o.type === 'bottom' || o.type === 'both') { const g = x.createLinearGradient(0, H * .4, 0, H); g.addColorStop(0, hexA(o.color, 0)); g.addColorStop(.55, hexA(o.color, o.opacity * .55)); g.addColorStop(1, hexA(o.color, o.opacity)); x.fillStyle = g; x.fillRect(0, 0, W, H); }
     if (o.type === 'top' || o.type === 'both') { const g = x.createLinearGradient(0, 0, 0, H * .5); g.addColorStop(0, hexA(o.color, o.opacity)); g.addColorStop(1, hexA(o.color, 0)); x.fillStyle = g; x.fillRect(0, 0, W, H); }
   }
@@ -1422,10 +1427,10 @@ function syncAll() {
 }
 /* Guides and the export menu describe whichever frame is open. */
 function syncFrame() {
-  const post = isPost(doc);
+  const post = isPost(doc) || (isAd(doc) && H === 1350);
   $('#guides').setAttribute('viewBox', `0 0 ${W} ${H}`);
   const guide = (el, show) => show ? el.removeAttribute('hidden') : el.setAttribute('hidden', '');
-  guide($('#guidesPost'), post); guide($('#guidesCover'), !post);
+  guide($('#guidesPost'), post); guide($('#guidesCover'), !post && H === 1920);
   $('#frameLbl').textContent = `${W} × ${H}`;
   const o = $$('#exportScale option');
   o[0].textContent = `${W}×${H} PNG`; o[1].textContent = `${W * 2}×${H * 2} PNG`; o[2].textContent = `${W}×${H} JPG`;
@@ -1467,15 +1472,16 @@ function lazyCanvas(d, cssW) {
    the editor. Posts never appear in the cover list, or in the profile grid. */
 function renderCoverList() {
   const c = $('#coverList'); c.innerHTML = '';
-  const inPost = isPost(doc);
+  const inPost = isPost(doc), inAd = isAd(doc);
   const list = inPost
     ? covers.filter(r => r.doc?.post?.cid === doc.post.cid).sort((a, b) => (a.doc.post.slide || 0) - (b.doc.post.slide || 0))
-    : covers.filter(r => !isPost(r.doc)).sort((a, b) => b.updatedAt - a.updatedAt);
-  $('#coverListTitle').textContent = inPost ? `Slides · ${doc.post.title || 'carousel'}` : 'Covers';
-  if (inPost) {
+    : inAd ? ((adGroups().find(g => g.key === doc.ad.setKey) || {}).boards || [])
+    : covers.filter(r => !isFeed(r.doc)).sort((a, b) => b.updatedAt - a.updatedAt);
+  $('#coverListTitle').textContent = inPost ? `Slides · ${doc.post.title || 'carousel'}` : inAd ? `Static ads · ${((adGroups().find(g => g.key === doc.ad.setKey) || {}).title || doc.ad.setKey).replace(/ — .*$/, '')}` : 'Covers';
+  if (inPost || inAd) {
     const back = document.createElement('button'); back.className = 'small ghost'; back.style.cssText = 'width:100%;margin-bottom:6px';
     back.textContent = '← Back to the covers';
-    back.onclick = () => { const r = [...covers].filter(x => !isPost(x.doc)).sort((a, b) => b.updatedAt - a.updatedAt)[0]; if (r) loadDoc(r.doc); };
+    back.onclick = () => { const r = [...covers].filter(x => !isFeed(x.doc)).sort((a, b) => b.updatedAt - a.updatedAt)[0]; if (r) loadDoc(r.doc); };
     c.appendChild(back);
   }
   if (!list.length) c.innerHTML = '<div class="empty">No covers yet.</div>';
@@ -1592,7 +1598,7 @@ $('#btnExportAll').onclick = async () => {
 };
 
 /* ---------------- grid view ---------------- */
-function gridOrdered() { const inGrid = (settings.gridOrder || []).map(id => covers.find(c => c.id === id)).filter(Boolean); const rest = covers.filter(c => !isPost(c.doc) && !settings.gridOrder?.includes(c.id)).sort((a, b) => b.updatedAt - a.updatedAt); return [...inGrid, ...rest]; }
+function gridOrdered() { const inGrid = (settings.gridOrder || []).map(id => covers.find(c => c.id === id)).filter(Boolean); const rest = covers.filter(c => !isFeed(c.doc) && !settings.gridOrder?.includes(c.id)).sort((a, b) => b.updatedAt - a.updatedAt); return [...inGrid, ...rest]; }
 let gridDrag = null;
 function renderGrid() {
   if (!$('#view-grid').classList.contains('active')) return;
@@ -1637,7 +1643,7 @@ function renderGrid() {
   }
   const gl = $('#gridList'); gl.innerHTML = ''; $('#gridEmpty').hidden = order.length > 0;
   order.forEach(r => gl.appendChild(gridRow(r, true)));
-  const pool = $('#gridPool'); pool.innerHTML = ''; covers.filter(c => !isPost(c.doc) && !settings.gridOrder.includes(c.id)).sort((a, b) => b.updatedAt - a.updatedAt).forEach(r => pool.appendChild(gridRow(r, false)));
+  const pool = $('#gridPool'); pool.innerHTML = ''; covers.filter(c => !isFeed(c.doc) && !settings.gridOrder.includes(c.id)).sort((a, b) => b.updatedAt - a.updatedAt).forEach(r => pool.appendChild(gridRow(r, false)));
   if (!pool.children.length) pool.innerHTML = '<div class="empty">Every cover is placed.</div>';
 }
 function gridRow(r, inGrid) {
@@ -2917,23 +2923,274 @@ async function deleteCarousel(g) {
   const ids = new Set(g.slides.map(r => r.id));
   for (const id of ids) await store.deleteCover(id).catch(() => {});
   covers = covers.filter(c => !ids.has(c.id));
-  if (ids.has(doc?.id)) { const next = covers.find(c => !isPost(c.doc)) || covers[0]; if (next) loadDoc(next.doc); }
+  if (ids.has(doc?.id)) { const next = covers.find(c => !isFeed(c.doc)) || covers[0]; if (next) loadDoc(next.doc); }
   renderPosts(); renderCoverList(); toast('Carousel deleted');
 }
 $('#btnNewCarousel').onclick = () => newCarousel();
 $('#btnExportCarousels').onclick = () => exportAllCarousels();
 
+/* ---------------- static ads ----------------
+   A static ad is an ordinary document at a Meta placement frame (the 4:5 feed
+   by default) that carries doc.ad, so every tool in the editor — layers, part
+   colour, gradients, the photo library, undo, versions — works on it with no
+   special case. Boards group into sets by doc.ad.setKey. They are kept out of
+   the cover list and the profile grid, like carousel posts.
+
+   Copy comes from statics.js, plates and sets from ads.js; seedAdSet builds each
+   board once at 1080×1350 and never rebuilds one that is already there. A square
+   or story variant is a second document with the same copy on a new frame. */
+const AD_SET = 'rts-ads-v1';
+const AD_FRAMES = { '4x5': { w: 1080, h: 1350, label: 'Feed 4:5' }, '1x1': { w: 1080, h: 1080, label: 'Square 1:1' }, '9x16': { w: 1080, h: 1920, label: 'Story 9:16' } };
+const rtsAds = () => window.__RTS_ADS__ || { sets: [], plates: [] };
+const staticById = id => (window.__RTS_STATICS__ || []).find(s => s.id === id) || {};
+const adBoardCfg = (setKey, id) => ((rtsAds().sets.find(s => s.key === setKey) || {}).boards || []).find(b => b.id === id);
+function loadAdFonts() {
+  return Promise.allSettled(['500 100px "Fraunces"', '600 100px "Fraunces"', 'italic 400 100px "Fraunces"'].map(f => document.fonts.load(f)));
+}
+/* CSS text-wrap: balance, emulated: the narrowest measure that keeps the line count. */
+function balancedWidth(l) {
+  const n = measureLayer(l).lines.length; if (n < 2) return l.width;
+  let lo = 0.2, hi = l.width;
+  for (let i = 0; i < 14; i++) { const mid = (lo + hi) / 2; if (measureLayer({ ...l, width: mid }).lines.length > n) lo = mid; else hi = mid; }
+  return Math.round(hi * 1000) / 1000;
+}
+/* The v1 CSS sizes (92/64/54/47, type 118) less 7%: canvas text has no optical-size axis, so Fraunces
+   renders wider than the boards' opsz 144 and the same size would break a line later than they did. */
+function adHeadSize(t, layout) { if (layout === 'type') return 110; const n = (t || '').length; return n <= 32 ? 86 : n <= 62 ? 60 : n <= 92 ? 50 : 44; }
+/* The v1 boards' CSS as layers: the block sits 84px in from the sides and is
+   stacked up from a floor 160px above the bottom (170 for the split layout, 190
+   for graphic and type), 18px between items, the signature strip 56px off the
+   floor. Floor offsets are in pixels, so the same code lays out a square or a
+   story. Each text layer carries a role so a variant can pick the copy back up. */
+function adLayers(o) {
+  const layout = o.layout || 'cover', left = layout === 'split';
+  const align = left ? 'left' : 'center', ax = left ? 84 / W : 0.5;
+  const mk = p => newText(Object.assign({ font: RTS.font, align, x: ax, color: RTS.white, box: 'none', outline: 0, shadow: 0.45, behind: false }, p));
+  const kicker = o.kicker ? mk({ role: 'kicker', text: o.kicker, weight: 600, size: 16, track: 0.24, line: 1.2, width: 0.844, upper: true, color: '#cfc8bb', shadow: 0.3 }) : null;
+  const head = mk({ role: 'head', text: o.head || '', weight: 500, size: adHeadSize(o.head, layout), track: layout === 'type' ? -0.015 : -0.008, line: 1.02, width: 0.844, upper: true });
+  head.width = balancedWidth(head);
+  const sub = o.sub ? mk({ role: 'sub', text: o.sub, weight: 400, italic: true, size: 25, track: 0, line: 1.3, width: 0.704, color: '#f1ece2', shadow: 0.3 }) : null;
+  const cta = o.cta ? mk({ role: 'cta', text: o.cta, weight: 600, size: 16, track: 0.2, line: 1.2, width: 0.844, upper: true, shadow: 0 }) : null;
+  const gap = 18, btnH = 53, floor = H - (left ? 170 : layout === 'graphic' || layout === 'type' ? 190 : 160);
+  const kH = kicker ? measureLayer(kicker).height : 0, hH = measureLayer(head).height, sH = sub ? measureLayer(sub).height : 0;
+  const total = (kicker ? kH + gap : 0) + hH + gap + 3 + gap + sH + 4 + (cta ? 8 + gap + btnH : 0);
+  let y = floor - total; const L = [];
+  if (layout === 'archival') { // the hairline frame, 40px in
+    const c = '#fbf7ef', a = 0.45;
+    L.push(newRule({ role: 'frame', x: 0.5, y: 40 / H, width: (W - 80) / W, thick: 1, color: c, alpha: a }), newRule({ role: 'frame', x: 0.5, y: (H - 40) / H, width: (W - 80) / W, thick: 1, color: c, alpha: a }),
+           newRule({ role: 'frame', x: 40.5 / W, y: 0.5, width: 1 / W, thick: H - 80, color: c, alpha: a }), newRule({ role: 'frame', x: (W - 40.5) / W, y: 0.5, width: 1 / W, thick: H - 80, color: c, alpha: a }));
+  }
+  if (kicker) { kicker.y = y / H; L.push(kicker); y += kH + gap; }
+  head.y = y / H; L.push(head); y += hH + gap;
+  L.push(newRule({ role: 'rule', x: left ? ax + 22 / W : 0.5, y: (y + 1.5) / H, width: 44 / W, thick: 3, color: RTS.red, alpha: 1 })); y += 3 + gap;
+  if (sub) { sub.y = y / H; L.push(sub); } y += sH + 4;
+  if (cta) {
+    y += 8 + gap;
+    const x = measureCtx(); x.font = fontString(cta); x.letterSpacing = `${cta.track * cta.size}px`;
+    const bw = x.measureText(cta.text.toUpperCase()).width + 60, yc = y + btnH / 2;
+    L.push(newRule({ role: 'button', x: left ? ax + bw / 2 / W : 0.5, y: yc / H, width: bw / W, thick: btnH, color: RTS.red, alpha: 1 }));
+    cta.y = (yc - cta.size * cta.line / 2) / H; L.push(cta);
+  }
+  L.push(...signatureLayers((H - 88) / H));
+  return L;
+}
+/* The copy a board carries now — its edited layers first, statics.js as the fallback. */
+function adCopyOf(d) {
+  const s = staticById(d.ad.id), role = r => { const l = d.layers.find(x => x.type === 'text' && x.role === r); return l ? l.text : undefined; };
+  const pick = (r, f) => { const v = role(r); return v === undefined ? (f || '') : v; };
+  return { name: d.ad.name, kicker: pick('kicker', s.kicker), head: pick('head', s.head), sub: pick('sub', s.sub), cta: pick('cta', s.cta) };
+}
+/* b: the board (bg, tall, scrim, layout, flag, pair) · frame: a key of AD_FRAMES · copy: kicker/head/sub/cta/name */
+function adDoc(set, b, frame, copy) {
+  const fr = AD_FRAMES[frame] || AD_FRAMES['4x5'];
+  const d = baseDoc(`Static ${b.id} · ${copy.name || b.id}`);
+  d.w = fr.w; d.h = fr.h;
+  d.subject = { ...d.subject, on: false }; d.grain = 0.04;
+  // a picture taller than the frame keeps one end: 'bottom' for the v2 stills (every original board was the
+  // bottom 1350 of the 1920-tall still), 'top' for a 4:5 plate on a square. bg.y is a fraction of
+  // max(slack, H/4) (bgBox), so the exact edge is slack / that, not ±1. Unloaded pictures are taken as 9:16.
+  const im = getImg(b.bg), ratio = im && im.naturalWidth ? im.naturalHeight / im.naturalWidth : 16 / 9;
+  const slack = Math.max(0, (fr.w * ratio - fr.h) / 2);
+  const y = b.anchor && slack > 0 ? (b.anchor === 'bottom' ? -1 : 1) * slack / Math.max(slack, fr.h * .25) : 0;
+  d.bg = { ...d.bg, type: 'image', image: b.bg, fit: 'fill', scale: 1, x: 0, y, blur: 0, bright: 1, sat: 1, pad: RTS.ink };
+  d.overlay = { type: b.scrim ? 'scrim' : 'none', color: '#0c0905', opacity: b.scrim || 0 };
+  d.layers = withSize(fr, () => adLayers({ layout: b.layout, kicker: copy.kicker, head: copy.head, sub: copy.sub, cta: copy.cta }));
+  d.ad = { set: AD_SET, key: `${set.key}:${b.id}:${frame}`, setKey: set.key, id: b.id, name: copy.name || b.id, layout: b.layout || 'cover', frame, ver: set.ver || '01', flag: b.flag || '', pair: b.pair || '' };
+  return d;
+}
+async function seedAdSet() {
+  const cfg = rtsAds(); if (!cfg.sets || !cfg.sets.length) return false;
+  setStatus('loading the static ads…');
+  await loadAdFonts();
+  const have = new Set(covers.filter(c => c.doc && c.doc.ad).map(c => c.doc.ad.key));
+  await preloadAssets([...new Set(cfg.sets.flatMap(s => s.boards.map(b => b.bg)))]);
+  // stamped older than the covers, so the studio still opens on the latest cover
+  let t = Math.min(Date.now(), ...covers.map(c => c.createdAt || Date.now())) - 72e5;
+  const recs = [];
+  for (const set of cfg.sets) for (const b of set.boards) {
+    if (have.has(`${set.key}:${b.id}:4x5`)) continue;          // an edited board is never rebuilt
+    const s = staticById(b.id);
+    const d = adDoc(set, { layout: s.layout || 'cover', ...b }, '4x5', { name: s.name || b.id, kicker: s.kicker, head: s.head, sub: s.sub, cta: s.cta });
+    d.createdAt = d.updatedAt = t++; recs.push(coverRecord(d));
+  }
+  if (recs.length) { await store.saveCovers(recs); covers = covers.concat(recs); }
+  settings.adSet = AD_SET; await store.saveSettings(settings).catch(() => {});
+  return recs.length > 0;
+}
+
+/* ---------------- the static ads view ---------------- */
+const adIdKey = id => String(id).replace(/\d+/g, m => m.padStart(3, '0'));
+const adFrameRank = f => Object.keys(AD_FRAMES).indexOf(f);
+function adGroups() {
+  const cfg = rtsAds(), order = new Map((cfg.sets || []).map((s, i) => [s.key, i]));
+  const by = new Map();
+  for (const c of covers) {
+    const a = c.doc && c.doc.ad; if (!a) continue;
+    let g = by.get(a.setKey);
+    if (!g) {
+      const meta = (cfg.sets || []).find(s => s.key === a.setKey) || {};
+      by.set(a.setKey, g = { key: a.setKey, title: meta.title || `Static set ${a.setKey}`, date: meta.date || '', note: meta.note || '', ver: meta.ver || a.ver || '01', boards: [] });
+    }
+    g.boards.push(c);
+  }
+  for (const g of by.values()) g.boards.sort((x, y) => adIdKey(x.doc.ad.id).localeCompare(adIdKey(y.doc.ad.id)) || adFrameRank(x.doc.ad.frame) - adFrameRank(y.doc.ad.frame));
+  return [...by.values()].sort((x, y) => (order.has(x.key) ? order.get(x.key) : 99) - (order.has(y.key) ? order.get(y.key) : 99));
+}
+let adFilter = 'all';
+function renderAds() {
+  const wrap = $('#adList'); if (!wrap) return;
+  wrap.innerHTML = '';
+  const all = adGroups();
+  $('#adEmpty').hidden = all.length > 0;
+  const flagged = all.reduce((k, g) => k + g.boards.filter(r => r.doc.ad.flag).length, 0);
+  const chips = [['all', 'All sets', all.reduce((k, g) => k + g.boards.length, 0)]]
+    .concat(all.map(g => [g.key, g.title.replace(/ — .*$/, ''), g.boards.length]))
+    .concat(flagged ? [['flag', 'Needs sign-off', flagged]] : []);
+  if (!chips.some(c => c[0] === adFilter)) adFilter = 'all';
+  const cc = $('#adChips'); cc.innerHTML = '';
+  chips.forEach(([v, label, n]) => {
+    const b = document.createElement('button'); b.className = 'chip'; b.type = 'button';
+    b.setAttribute('aria-pressed', v === adFilter); b.innerHTML = `${escapeHtml(label)}<i>${n}</i>`;
+    b.onclick = () => { adFilter = v; renderAds(); };
+    cc.appendChild(b);
+  });
+  all.filter(g => adFilter === 'all' || adFilter === 'flag' || g.key === adFilter)
+    .map(g => adFilter === 'flag' ? { ...g, boards: g.boards.filter(r => r.doc.ad.flag) } : g)
+    .filter(g => g.boards.length)
+    .forEach(g => wrap.appendChild(adCard(g)));
+}
+function adCard(g) {
+  const el = document.createElement('article'); el.className = 'pcard acard'; el.dataset.set = g.key;
+  const head = document.createElement('header'), meta = document.createElement('div');
+  meta.innerHTML = `<span class="kicker">${escapeHtml(g.date)}${g.date ? ' · ' : ''}exports as v${escapeHtml(g.ver)}</span>`
+    + `<h3>${escapeHtml(g.title)}</h3>`
+    + (g.note ? `<p class="insight">${escapeHtml(g.note)}</p>` : '');
+  const acts = document.createElement('div'); acts.className = 'acts';
+  acts.innerHTML = '<button class="small">Export set</button><button class="small ghost">+ Board</button>';
+  const [exp, add] = $$('button', acts);
+  exp.onclick = () => exportAdSet(g); add.onclick = () => newAdBoard(g);
+  head.append(meta, acts); el.appendChild(head);
+  const row = document.createElement('div'); row.className = 'pslides';
+  const frames = new Map();
+  g.boards.forEach(r => { const a = r.doc.ad; if (!frames.has(a.id)) frames.set(a.id, new Set()); frames.get(a.id).add(a.frame); });
+  g.boards.forEach(r => row.appendChild(adTile(r, frames.get(r.doc.ad.id))));
+  el.appendChild(row);
+  return el;
+}
+function adTile(r, have) {
+  const a = r.doc.ad, live = r.id === doc?.id ? doc : r.doc, fr = AD_FRAMES[a.frame] || AD_FRAMES['4x5'];
+  const el = document.createElement('div'); el.className = 'pslide ad'; el.setAttribute('aria-current', r.id === doc?.id); el.dataset.id = r.id;
+  const b = document.createElement('button'); b.className = 'tile'; b.type = 'button'; b.title = `Open ${a.id} (${fr.label}) in the editor`;
+  b.appendChild(lazyCanvas(live, 158));
+  const no = document.createElement('span'); no.className = 'no'; no.textContent = a.frame === '4x5' ? a.id : `${a.id} · ${a.frame.replace('x', ':')}`; b.appendChild(no);
+  b.onclick = () => { loadDoc(live); switchView('editor'); };
+  const cap = document.createElement('div'); cap.className = 'cap';
+  cap.innerHTML = `<b>${escapeHtml(fr.label)}${a.pair ? ' · with ' + escapeHtml(a.pair) : ''}</b>${escapeHtml(a.name)}`
+    + (a.flag ? `<span class="flag">~ ${escapeHtml(a.flag)}</span>` : '');
+  el.append(b, cap);
+  if (a.frame === '4x5') {
+    const vars = document.createElement('div'); vars.className = 'vars';
+    for (const [k, f] of Object.entries(AD_FRAMES)) {
+      if (k === '4x5' || (have && have.has(k))) continue;
+      const v = document.createElement('button'); v.className = 'small ghost'; v.type = 'button'; v.textContent = '+ ' + f.label;
+      v.title = `Make a ${f.label} version of ${a.id} with the same copy`;
+      v.onclick = () => addAdVariant(r, k);
+      vars.appendChild(v);
+    }
+    if (vars.children.length) el.appendChild(vars);
+  }
+  return el;
+}
+const adFile = d => `Static ${d.ad.id} - ${d.ad.name} - ${d.ad.frame} v${d.ad.ver}`.replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').trim();
+const adDocs = g => g.boards.map(r => r.id === doc?.id ? doc : r.doc);
+async function exportAdSet(g) {
+  if (!g.boards.length) return;
+  setStatus('rendering…'); toast(`Rendering ${g.boards.length} boards…`);
+  await loadAdFonts(); await awaitSlidePhotos(adDocs(g));
+  const zip = new JSZip();
+  for (const d of adDocs(g)) zip.file(`${adFile(d)}.png`, await renderBlob(d, 1));
+  const ok = await store.download(`static-set-${g.key}-${new Date().toISOString().slice(0, 10)}.zip`, await zip.generateAsync({ type: 'blob' }));
+  setStatus('saved · this browser', 'ok'); toast(ok ? `${g.boards.length} boards exported` : 'Export cancelled');
+}
+async function exportAllAds() {
+  const all = adGroups(); if (!all.length) return toast('No static ads yet');
+  const n = all.reduce((k, g) => k + g.boards.length, 0);
+  setStatus('rendering…'); toast(`Rendering ${n} boards…`);
+  await loadAdFonts();
+  for (const g of all) await awaitSlidePhotos(adDocs(g));
+  const zip = new JSZip();
+  for (const g of all) for (const d of adDocs(g)) zip.file(`${g.key}/${adFile(d)}.png`, await renderBlob(d, 1));
+  const ok = await store.download(`static-ads-${new Date().toISOString().slice(0, 10)}.zip`, await zip.generateAsync({ type: 'blob' }));
+  setStatus('saved · this browser', 'ok'); toast(ok ? `${n} boards exported` : 'Export cancelled');
+}
+/* A square or story version of a board: the same copy and the same picture
+   (including a swapped one), laid out again on the new frame. */
+async function addAdVariant(r, frame) {
+  const src = r.id === doc?.id ? doc : r.doc, a = src.ad;
+  const key = `${a.setKey}:${a.id}:${frame}`;
+  const exists = covers.find(c => c.doc && c.doc.ad && c.doc.ad.key === key);
+  if (exists) { loadDoc(exists.doc); switchView('editor'); return; }
+  const set = rtsAds().sets.find(s => s.key === a.setKey) || { key: a.setKey, ver: a.ver };
+  const cfg = adBoardCfg(a.setKey, a.id) || {};
+  const im = getImg(src.bg.image), fr = AD_FRAMES[frame];
+  // a picture taller than the new frame keeps the end the board was showing (its plate's anchor, or the way
+  // it was dragged); a 4:5 plate on a square keeps its top, where the faces and the drawings are
+  const ratio = im && im.naturalWidth ? im.naturalHeight / im.naturalWidth : 16 / 9;
+  const anchor = ratio <= fr.h / fr.w + 0.01 ? '' : src.bg.image === cfg.bg && cfg.anchor ? cfg.anchor : ratio > 1.7 ? (src.bg.y < 0 ? 'bottom' : 'top') : 'top';
+  const scrim = src.overlay && src.overlay.type === 'scrim' ? src.overlay.opacity : 0;
+  await loadAdFonts();
+  const d = adDoc(set, { ...cfg, id: a.id, layout: a.layout, flag: a.flag, pair: a.pair, bg: src.bg.image, anchor, scrim }, frame, adCopyOf(src));
+  d.bg = { ...d.bg, bright: src.bg.bright, sat: src.bg.sat, blur: src.bg.blur };
+  d.createdAt = d.updatedAt = Date.now();
+  const rec = coverRecord(d); covers.push(rec); await store.saveCovers([rec]);
+  renderAds(); toast(`${fr.label} version of ${a.id} added`);
+}
+/* A blank board in a set, on the calm frontal still, ready to write. */
+async function newAdBoard(g) {
+  const set = rtsAds().sets.find(s => s.key === g.key) || { key: g.key, ver: g.ver };
+  const used = new Set(covers.filter(c => c.doc && c.doc.ad).map(c => c.doc.ad.id));
+  let n = 1; while (used.has(`N${n}`)) n++;
+  await loadAdFonts();
+  const d = adDoc(set, { id: `N${n}`, layout: 'cover', bg: BUILTIN.d1s47 ? 'd1s47' : 'rtsA41', anchor: 'bottom', scrim: 0.95 }, '4x5',
+    { name: 'New board', kicker: 'Return to Self', head: 'Your headline here.', sub: 'One line underneath it.', cta: 'See how the 12 weeks work' });
+  d.ad.key = `${g.key}:N${n}:x${uid()}`;      // hand-made, so re-seeding can never touch it
+  d.createdAt = d.updatedAt = Date.now();
+  const rec = coverRecord(d); covers.push(rec); await store.saveCovers([rec]);
+  adFilter = 'all'; renderAds(); toast('Board added — open it to write it');
+}
+$('#btnExportAds').onclick = () => exportAllAds();
+
 /* ---------------- views ---------------- */
 function switchView(v) {
   $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.view === v));
   $$('.view').forEach(s => s.classList.toggle('active', s.id === 'view-' + v));
-  if (v === 'grid') { renderGrid(); renderMosaicPreview(); } if (v === 'cutout') renderCutoutView(); if (v === 'editor') renderAll(); if (v === 'batch') renderBatchView(); if (v === 'posts') renderPosts();
+  if (v === 'grid') { renderGrid(); renderMosaicPreview(); } if (v === 'cutout') renderCutoutView(); if (v === 'editor') renderAll(); if (v === 'batch') renderBatchView(); if (v === 'posts') renderPosts(); if (v === 'ads') renderAds();
 }
 $$('nav.tabs button').forEach(b => b.onclick = () => switchView(b.dataset.view));
 document.fonts.addEventListener('loadingdone', () => { renderAll(); renderCoverList(); renderTemplates(); if ($('#view-grid').classList.contains('active')) renderGrid(); });
 
 /* A read-only handle on the live state, for the console and for tests. */
-window.__rcs = { get settings() { return settings; }, get covers() { return covers; }, get doc() { return doc; }, get spanOpts() { return spanOpts; }, get mosaicOpts() { return mosaicOpts; }, assetsOf, setSpanAt, switchView };
+window.__rcs = { get settings() { return settings; }, get covers() { return covers; }, get doc() { return doc; }, get spanOpts() { return spanOpts; }, get mosaicOpts() { return mosaicOpts; }, assetsOf, setSpanAt, switchView, adGroups, renderAds };
 
 /* ---------------- boot ---------------- */
 (async () => {
@@ -2952,6 +3209,7 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   if (settings.staticSet !== STATIC_SET) { try { await seedStaticSet(); } catch (e) { console.warn('static set', e); } }
   if (settings.mosaicSet !== MOSAIC_SET) { try { await seedMosaicSet(); } catch (e) { console.warn('mosaic set', e); } }
   if (settings.postSet !== POST_SET) { try { await seedPostSet(); } catch (e) { console.warn('post set', e); } }
+  if (settings.adSet !== AD_SET) { try { await seedAdSet(); } catch (e) { console.warn('ad set', e); } }
   const todo = location.hash === '#todo';
   if (todo && settings.reelSet !== REEL_SET) { try { await seedReelSet(); } catch (e) { console.warn('reel set', e); } }
   if (settings.demoView !== DEMO_VIEW) { settings.shape = '34'; settings.demoView = DEMO_VIEW; store.saveSettings(settings).catch(() => {}); }
@@ -2970,6 +3228,7 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   // a first visit, or a link ending #grid, opens straight on the profile
   if (!fromPoster && (seeded || todo || location.hash === '#grid')) switchView('grid');
   if (location.hash === '#posts') switchView('posts');   // a link straight to the carousels
+  if (location.hash === '#ads') switchView('ads');       // a link straight to the static ads
   if (todo) { // the statics sit above the queue, so bring the first cover still to do into view
     const next = (settings.gridOrder || []).find(id => onPlaceholder(covers.find(c => c.id === id)?.doc));
     $$('#igrid .tile').find(t => t.dataset.id === next)?.scrollIntoView({ block: 'center' });

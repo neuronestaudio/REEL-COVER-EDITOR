@@ -146,7 +146,11 @@ aside.right{border-left:1px solid var(--line)}
 .pslide .cap{margin-top:5px;font-size:10.5px;line-height:1.4;color:var(--dim)}
 .pslide .cap b{display:block;color:var(--muted);font-weight:600;letter-spacing:.06em;font-family:var(--font-mono);font-size:9.5px;text-transform:uppercase;margin-bottom:2px}
 .pslide .addslide{width:100%;min-height:92px;border-style:dashed;color:var(--muted);border-radius:6px}
-#postEmpty{color:var(--muted);font-size:13px;padding:30px 4px}
+#postEmpty,#adEmpty{color:var(--muted);font-size:13px;padding:30px 4px}
+/* Static ads: the same cards, 4:5 tiles, a sign-off flag and the variant buttons under a board */
+.pslide .cap .flag{display:block;margin-top:3px;color:#e3947c}
+.pslide .vars{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+.pslide .vars button{padding:2px 7px;font-size:10px}
 /* photo library — a single row until it is opened */
 .lib{border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,var(--raised),var(--panel));overflow:hidden}
 .lib[data-open=true]{border-color:var(--line-2)}
@@ -381,6 +385,7 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
     <button role="tab" aria-selected="true" data-view="editor">Editor</button>
     <button role="tab" aria-selected="false" data-view="grid">Profile grid</button>
     <button role="tab" aria-selected="false" data-view="posts">Carousel posts</button>
+    <button role="tab" aria-selected="false" data-view="ads">Static Ads</button>
     <button role="tab" aria-selected="false" data-view="cutout">Cutout &amp; backgrounds</button>
     <button role="tab" aria-selected="false" data-view="batch">Batch 72</button>
   </nav>
@@ -431,7 +436,7 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
       <svg id="guides" class="on" viewBox="0 0 1080 1920" preserveAspectRatio="none">
         <g id="guidesPost" hidden>
           <rect x="86" y="86" width="908" height="1178" fill="none" stroke="rgba(217,164,65,.55)" stroke-width="3" stroke-dasharray="14 12"/>
-          <text x="96" y="64" font-family="JetBrains Mono, monospace" font-size="26" fill="rgba(241,236,223,.55)">1080 × 1350 CAROUSEL · KEEP TYPE INSIDE</text>
+          <text x="96" y="64" font-family="JetBrains Mono, monospace" font-size="26" fill="rgba(241,236,223,.55)">1080 × 1350 · 4:5 FEED · KEEP TYPE INSIDE</text>
         </g>
         <g id="guidesCover">
         <rect x="0" y="0" width="1080" height="240" fill="rgba(224,122,106,.10)"/>
@@ -537,6 +542,7 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
       <div class="chips" id="ovType">
         <button class="chip" data-v="none">None</button>
         <button class="chip" data-v="bottom">Bottom fade</button>
+        <button class="chip" data-v="scrim">Ad scrim</button>
         <button class="chip" data-v="top">Top fade</button>
         <button class="chip" data-v="both">Both</button>
         <button class="chip" data-v="vignette">Vignette</button>
@@ -739,6 +745,24 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
   </div>
 </section>
 
+<!-- ================= STATIC ADS ================= -->
+<section class="view" id="view-ads">
+  <div class="postwrap">
+    <div class="postbar">
+      <div>
+        <h2>Static Ads</h2>
+        <p>The Return to Self static boards at the Meta feed frame, 1080 × 1350 (4:5). Open a board to change the words, drag the elements or swap the picture from the photo library (the Day 1 stills are in there); a square or story version of any board is one click. Lines marked ~ are trimmed or paraphrased and need Harrison’s sign-off.</p>
+      </div>
+      <div class="acts">
+        <button class="small" id="btnExportAds">Export every set</button>
+      </div>
+    </div>
+    <div class="pchips" id="adChips"></div>
+    <div id="adList"></div>
+    <div id="adEmpty" hidden>No static ads yet.</div>
+  </div>
+</section>
+
 <section class="view" id="view-cutout">
   <aside class="left">
     <div class="sec">
@@ -874,6 +898,8 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
 <script src="people.js"></script>
 <script src="posts.js"></script>
 <script src="wa-sets.js"></script>
+<script src="stills.js"></script>
+<script src="ads.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
