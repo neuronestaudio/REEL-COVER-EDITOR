@@ -1,10 +1,10 @@
-/* FINAL ADS SUBMISSION (27 Sep 2026): the finished static boards Dion collected in Downloads\Statics Ads 1 and
-   Statics Ads 2 (23 unique files: the studio's own exports in several takes, plus the seiza portrait), rebuilt here
-   as 1080-wide JPEGs so every browser carries them. seedFinalSet() in app.js turns each into a board of the 'final'
-   set on the Static Ads tab: the picture as the whole board, no layers, so it exports exactly as it is. Boards from
-   any other set can be dragged into this one, and the set can be reordered by drag; Export submission names the
-   files in that order. Bump `set` to seed new pictures into browsers that already hold the set (an edited, moved or
-   deleted board is never rebuilt: the seeder keys on ad.key). Order here: folder, then board code, then take. */
+/* FINAL ADS SUBMISSION (27 Sep 2026): the finished static boards Dion collected in Downloads\Statics Ads 1 and
+   Statics Ads 2 (23 unique files: the studio's own exports in several takes, plus the seiza portrait), rebuilt here
+   as 1080-wide JPEGs so every browser carries them. seedFinalSet() in app.js turns each into a board of the 'final'
+   set on the Static Ads tab: the picture as the whole board, no layers, so it exports exactly as it is. Boards from
+   any other set can be dragged into this one, and the set can be reordered by drag; Export submission names the
+   files in that order. Bump `set` to seed new pictures into browsers that already hold the set (an edited, moved or
+   deleted board is never rebuilt: the seeder keys on ad.key). Order here: folder, then board code, then take. */
 window.__RTS_FINAL__ = {
  "set": "final-1",
  "key": "final",
@@ -31,7 +31,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f02-a5-1-same-argument-t1.jpg",
    "thumb": "assets/final/t/f02-a5-1-same-argument-t1.jpg",
-   "src": "Statics Ads 1/static-a5-1-same-argument-1080x1350.png"
+   "src": "Statics Ads 1/static-a5-1-same-argument-1080x1350.png",
+   "cta": {
+    "x": 0.4491,
+    "y": 0.8,
+    "w": 0.6667,
+    "h": 94
+   },
+   "ctaNow": "Helping people understand their patterns, regulate their reactions and make choices that feel more aligned with who they are."
   },
   {
    "id": "F03",
@@ -42,7 +49,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f03-a5-1-same-argument-t2.jpg",
    "thumb": "assets/final/t/f03-a5-1-same-argument-t2.jpg",
-   "src": "Statics Ads 1/static-a5-1-same-argument-1080x1350 (1).png"
+   "src": "Statics Ads 1/static-a5-1-same-argument-1080x1350 (1).png",
+   "cta": {
+    "x": 0.5,
+    "y": 0.81,
+    "w": 1.0,
+    "h": 101
+   },
+   "ctaNow": "Combining 17+ years of karate and coaching to help people move through life with greater awareness, intention and self-worth."
   },
   {
    "id": "F04",
@@ -53,7 +67,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f04-a5-2-don-t-have-to-react-t2.jpg",
    "thumb": "assets/final/t/f04-a5-2-don-t-have-to-react-t2.jpg",
-   "src": "Statics Ads 1/static-a5-2-don-t-have-to-react-1080x1350 (1).png"
+   "src": "Statics Ads 1/static-a5-2-don-t-have-to-react-1080x1350 (1).png",
+   "cta": {
+    "x": 0.5,
+    "y": 0.7937,
+    "w": 1.0,
+    "h": 53
+   },
+   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space between what they feel and how they respond."
   },
   {
    "id": "F05",
@@ -64,7 +85,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f05-a5-2-don-t-have-to-react-t3.jpg",
    "thumb": "assets/final/t/f05-a5-2-don-t-have-to-react-t3.jpg",
-   "src": "Statics Ads 1/static-a5-2-don-t-have-to-react-1080x1350 (2).png"
+   "src": "Statics Ads 1/static-a5-2-don-t-have-to-react-1080x1350 (2).png",
+   "cta": {
+    "x": 0.5,
+    "y": 0.7937,
+    "w": 1.0,
+    "h": 53
+   },
+   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space between what they feel and how they respond."
   },
   {
    "id": "F06",
@@ -75,7 +103,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f06-a5-2-don-t-have-to-react-t4.jpg",
    "thumb": "assets/final/t/f06-a5-2-don-t-have-to-react-t4.jpg",
-   "src": "Statics Ads 1/static-a5-2-don-t-have-to-react-1080x1350 (3).png"
+   "src": "Statics Ads 1/static-a5-2-don-t-have-to-react-1080x1350 (3).png",
+   "cta": {
+    "x": 0.5,
+    "y": 0.7756,
+    "w": 1.0,
+    "h": 204
+   },
+   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space between what they feel and how they respond."
   },
   {
    "id": "F07",
@@ -86,7 +121,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f07-a5-2-don-t-have-to-react-t5.jpg",
    "thumb": "assets/final/t/f07-a5-2-don-t-have-to-react-t5.jpg",
-   "src": "Statics Ads 1/static-a5-2-don-t-have-to-react-1080x1350 (4).png"
+   "src": "Statics Ads 1/static-a5-2-don-t-have-to-react-1080x1350 (4).png",
+   "cta": {
+    "x": 0.5,
+    "y": 0.7756,
+    "w": 1.0,
+    "h": 204
+   },
+   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space between what they feel and how they respond."
   },
   {
    "id": "F08",
@@ -97,7 +139,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f08-a5-2-don-t-have-to-react-t6.jpg",
    "thumb": "assets/final/t/f08-a5-2-don-t-have-to-react-t6.jpg",
-   "src": "Statics Ads 1/static-a5-2-don-t-have-to-react-1080x1350 (5).png"
+   "src": "Statics Ads 1/static-a5-2-don-t-have-to-react-1080x1350 (5).png",
+   "cta": {
+    "x": 0.4981,
+    "y": 0.5748,
+    "w": 0.5111,
+    "h": 106
+   },
+   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space so they can truly connect to their intentions and values."
   },
   {
    "id": "F09",
@@ -108,7 +157,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f09-a5-2-don-t-have-to-react-t8.jpg",
    "thumb": "assets/final/t/f09-a5-2-don-t-have-to-react-t8.jpg",
-   "src": "Statics Ads 1/static-a5-2-don-t-have-to-react-1080x1350 (7).png"
+   "src": "Statics Ads 1/static-a5-2-don-t-have-to-react-1080x1350 (7).png",
+   "cta": {
+    "x": 0.5,
+    "y": 0.7937,
+    "w": 1.0,
+    "h": 53
+   },
+   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space between what they feel and how they respond."
   },
   {
    "id": "F10",
@@ -119,7 +175,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f10-a5-4-discipline-and-presence-t1.jpg",
    "thumb": "assets/final/t/f10-a5-4-discipline-and-presence-t1.jpg",
-   "src": "Statics Ads 1/static-a5-4-discipline-and-presence-1080x1350.png"
+   "src": "Statics Ads 1/static-a5-4-discipline-and-presence-1080x1350.png",
+   "cta": {
+    "x": 0.4917,
+    "y": 0.7733,
+    "w": 0.5574,
+    "h": 98
+   },
+   "ctaNow": "Combining 17+ Years of Karate, personal coaching , and somatic breathwork to help people move through life with greater awareness, intention and self-worth."
   },
   {
    "id": "F11",
@@ -130,7 +193,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f11-a5-6-a-need-to-feel-worthy-t1.jpg",
    "thumb": "assets/final/t/f11-a5-6-a-need-to-feel-worthy-t1.jpg",
-   "src": "Statics Ads 1/static-a5-6-a-need-to-feel-worthy-1080x1350.png"
+   "src": "Statics Ads 1/static-a5-6-a-need-to-feel-worthy-1080x1350.png",
+   "cta": {
+    "x": 0.5,
+    "y": 0.8396,
+    "w": 0.3685,
+    "h": 53
+   },
+   "ctaNow": "See how the 12 weeks work"
   },
   {
    "id": "F12",
@@ -141,7 +211,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f12-a5-6-a-need-to-feel-worthy-t2.jpg",
    "thumb": "assets/final/t/f12-a5-6-a-need-to-feel-worthy-t2.jpg",
-   "src": "Statics Ads 1/static-a5-6-a-need-to-feel-worthy-1080x1350 (1).png"
+   "src": "Statics Ads 1/static-a5-6-a-need-to-feel-worthy-1080x1350 (1).png",
+   "cta": {
+    "x": 0.5,
+    "y": 0.8396,
+    "w": 0.3685,
+    "h": 53
+   },
+   "ctaNow": "See how the 12 weeks work"
   },
   {
    "id": "F13",
@@ -152,7 +229,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f13-a5-6-a-need-to-feel-worthy-t3.jpg",
    "thumb": "assets/final/t/f13-a5-6-a-need-to-feel-worthy-t3.jpg",
-   "src": "Statics Ads 1/static-a5-6-a-need-to-feel-worthy-1080x1350 (2).png"
+   "src": "Statics Ads 1/static-a5-6-a-need-to-feel-worthy-1080x1350 (2).png",
+   "cta": {
+    "x": 0.5,
+    "y": 0.8396,
+    "w": 0.3685,
+    "h": 53
+   },
+   "ctaNow": "See how the 12 weeks work"
   },
   {
    "id": "F14",
@@ -163,7 +247,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f14-a5-7-nothing-left-to-prove-t1.jpg",
    "thumb": "assets/final/t/f14-a5-7-nothing-left-to-prove-t1.jpg",
-   "src": "Statics Ads 1/static-a5-7-nothing-left-to-prove-1080x1350.png"
+   "src": "Statics Ads 1/static-a5-7-nothing-left-to-prove-1080x1350.png",
+   "cta": {
+    "x": 0.5,
+    "y": 0.8237,
+    "w": 1.0,
+    "h": 52
+   },
+   "ctaNow": "Combining 17+ years of karate , personal coach, and breathwork training to empower individuals to connect with their core values"
   },
   {
    "id": "F15",
@@ -174,7 +265,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f15-a5-8-impressive-disconnected-t1.jpg",
    "thumb": "assets/final/t/f15-a5-8-impressive-disconnected-t1.jpg",
-   "src": "Statics Ads 1/static-a5-8-impressive-disconnected-1080x1350.png"
+   "src": "Statics Ads 1/static-a5-8-impressive-disconnected-1080x1350.png",
+   "cta": {
+    "x": 0.4958,
+    "y": 0.8041,
+    "w": 0.3694,
+    "h": 53
+   },
+   "ctaNow": "Gain back agency of your life"
   },
   {
    "id": "F16",
@@ -185,7 +283,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f16-a5-9-still-not-enough-t1.jpg",
    "thumb": "assets/final/t/f16-a5-9-still-not-enough-t1.jpg",
-   "src": "Statics Ads 1/static-a5-9-still-not-enough-1080x1350.png"
+   "src": "Statics Ads 1/static-a5-9-still-not-enough-1080x1350.png",
+   "cta": {
+    "x": 0.5389,
+    "y": 0.7467,
+    "w": 0.9222,
+    "h": 186
+   },
+   "ctaNow": "Helping people understand their patterns, regulate their reactions and make choices that feel more aligned with who they are."
   },
   {
    "id": "F17",
@@ -196,7 +301,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f17-a2-1-before-he-s-gone-t1.jpg",
    "thumb": "assets/final/t/f17-a2-1-before-he-s-gone-t1.jpg",
-   "src": "Statics Ads 2/static-a2-1-before-he-s-gone-1080x1350.png"
+   "src": "Statics Ads 2/static-a2-1-before-he-s-gone-1080x1350.png",
+   "cta": {
+    "x": 0.5,
+    "y": 0.8267,
+    "w": 0.837,
+    "h": 66
+   },
+   "ctaNow": "This is for you, if you want to connect with your loved ones but your upbringing makes it feel like its impossible."
   },
   {
    "id": "F18",
@@ -207,7 +319,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f18-a4-1-your-value-doesn-t-disappear-t1.jpg",
    "thumb": "assets/final/t/f18-a4-1-your-value-doesn-t-disappear-t1.jpg",
-   "src": "Statics Ads 2/static-a4-1-your-value-doesn-t-disappear-1080x1350.png"
+   "src": "Statics Ads 2/static-a4-1-your-value-doesn-t-disappear-1080x1350.png",
+   "cta": {
+    "x": 0.5125,
+    "y": 0.8033,
+    "w": 0.7231,
+    "h": 53
+   },
+   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values"
   },
   {
    "id": "F19",
@@ -218,7 +337,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f19-a4-1-your-value-doesn-t-disappear-t2.jpg",
    "thumb": "assets/final/t/f19-a4-1-your-value-doesn-t-disappear-t2.jpg",
-   "src": "Statics Ads 2/static-a4-1-your-value-doesn-t-disappear-1080x1350(1).png"
+   "src": "Statics Ads 2/static-a4-1-your-value-doesn-t-disappear-1080x1350(1).png",
+   "cta": {
+    "x": 0.5125,
+    "y": 0.8033,
+    "w": 0.7231,
+    "h": 53
+   },
+   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values"
   },
   {
    "id": "F20",
@@ -229,7 +355,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f20-a4-3-unappreciated-t1.jpg",
    "thumb": "assets/final/t/f20-a4-3-unappreciated-t1.jpg",
-   "src": "Statics Ads 2/static-a4-3-unappreciated-1080x1350.png"
+   "src": "Statics Ads 2/static-a4-3-unappreciated-1080x1350.png",
+   "cta": {
+    "x": 0.5019,
+    "y": 0.8137,
+    "w": 0.7074,
+    "h": 53
+   },
+   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values"
   },
   {
    "id": "F21",
@@ -240,7 +373,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f21-a4-3-unappreciated-t2.jpg",
    "thumb": "assets/final/t/f21-a4-3-unappreciated-t2.jpg",
-   "src": "Statics Ads 2/static-a4-3-unappreciated-1080x1350(1).png"
+   "src": "Statics Ads 2/static-a4-3-unappreciated-1080x1350(1).png",
+   "cta": {
+    "x": 0.5019,
+    "y": 0.8137,
+    "w": 0.7074,
+    "h": 53
+   },
+   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values"
   },
   {
    "id": "F22",
@@ -251,7 +391,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f22-a4-3-unappreciated-t3.jpg",
    "thumb": "assets/final/t/f22-a4-3-unappreciated-t3.jpg",
-   "src": "Statics Ads 2/static-a4-3-unappreciated-1080x1350(2).png"
+   "src": "Statics Ads 2/static-a4-3-unappreciated-1080x1350(2).png",
+   "cta": {
+    "x": 0.5019,
+    "y": 0.8137,
+    "w": 0.7074,
+    "h": 53
+   },
+   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values"
   },
   {
    "id": "F23",
@@ -262,7 +409,14 @@ window.__RTS_FINAL__ = {
    "h": 1350,
    "url": "assets/final/f23-a4-4-outwork-all-your-problems-t2.jpg",
    "thumb": "assets/final/t/f23-a4-4-outwork-all-your-problems-t2.jpg",
-   "src": "Statics Ads 2/static-a4-4-outwork-all-your-problems-1080x1350(1).png"
+   "src": "Statics Ads 2/static-a4-4-outwork-all-your-problems-1080x1350(1).png",
+   "cta": {
+    "x": 0.5144,
+    "y": 0.8319,
+    "w": 0.7528,
+    "h": 52
+   },
+   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values"
   }
  ]
 };

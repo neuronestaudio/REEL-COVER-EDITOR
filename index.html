@@ -150,7 +150,17 @@ aside.right{border-left:1px solid var(--line)}
 /* Static ads: the same cards, 4:5 tiles, a sign-off flag and the variant buttons under a board */
 .pslide .cap .flag{display:block;margin-top:3px;color:#e3947c}
 .pslide .cap .dir{display:block;margin-top:3px;font-style:italic}
-#ctaList .chip{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The CTA list reads as the lines themselves — scrolling through "CTA 01, CTA 02" told you nothing. */
+#ctaList{display:grid;gap:5px;max-height:min(46vh,330px);overflow-y:auto;padding-right:3px;scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+#ctaList .ctaGrp{font:9.5px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin:6px 0 1px}
+#ctaList .ctaGrp:first-child{margin-top:0}
+#ctaList .ctaRow{display:flex;gap:7px;align-items:flex-start;width:100%;text-align:left;padding:7px 8px;border:1px solid var(--line);border-radius:7px;background:var(--ink);cursor:pointer;color:inherit}
+#ctaList .ctaRow:hover{border-color:var(--accent);background:var(--raised)}
+#ctaList .ctaRow[aria-current=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+#ctaList .ctaRow .t{flex:1;min-width:0;font-size:11.5px;line-height:1.4;color:var(--text);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+#ctaList .ctaRow .b{display:inline-block;margin-top:3px;font:9px var(--font-mono);letter-spacing:.09em;text-transform:uppercase;color:var(--accent-ink);background:var(--accent);padding:2px 5px;border-radius:3px}
+#ctaList .ctaRow .u{font:9px var(--font-mono);letter-spacing:.08em;color:var(--dim);white-space:nowrap;padding-top:2px}
+#ctaList .ctaRow .del{flex:0 0 auto;opacity:.55;background:none;border:0;padding:0 2px;color:inherit;cursor:pointer}
 .pslide .vars{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
 .pslide .vars button{padding:2px 7px;font-size:10px}
 /* photo library — a single row until it is opened */

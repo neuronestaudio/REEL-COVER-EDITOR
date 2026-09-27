@@ -128,12 +128,29 @@ block of your own, so a lock-up built once on any cover can be pasted onto every
 Own blocks live in that browser's settings; every paste is ordinary layers and one undo step.
 
 **CTA badges** — one click puts a call to action on the open cover: a positioning line and,
-if it has one, a button. The eight CTA lines from Harrison's static ad brief are built in
-(`ads.js`, `ctas`), each with the *See how the 12 weeks work* button. Type a different line or
+if it has one, a button. **Every entry is listed as the line it actually says**, with its code
+kept as a quiet label on the right — picking one used to mean opening *CTA 01*, *CTA 02* and the
+rest in turn to find out what they were. They come in three groups: the submission CTA, the eight
+lines from Harrison's static ad brief (`ads.js`, `ctas`, each with the *See how the 12 weeks work*
+button), and the lines the boards in **FINAL ADS SUBMISSION** were actually exported with, read
+off the pictures themselves and de-duplicated against the brief (`final.js`, `ctaNow`) — several
+of those were edited in the studio before export and existed nowhere else. Type a different line or
 button in the fields under the badges to use your own, and **Save as badge** keeps it for every
 cover in that browser. On a static ad a badge replaces the board's own footer line and button and
 lays the board out again inside the safe box; on anything else it lands as ordinary layers near
 the foot. Either way it is one undo step.
+
+**One call to action across the submission.** The boards in FINAL ADS SUBMISSION are finished
+pictures with their old call to action printed on them, so a new one is laid over the top: a bar
+the exact size of the old one, in the same vermilion, with the line centred on it. `final.js`
+carries that rectangle (`cta`) and the old wording (`ctaNow`) for every board, measured from the
+picture. **Submission CTA** on the set card sets the line for the whole set; `FINAL_CTA` is what
+a browser seeds with and bumping `FINAL_CTA_REV` pushes a new line to browsers that already hold
+the set. Three boards needed their rectangle widened by hand because the call to action ran past
+the bar: F16 has the button as plain text under it, F17 puts only the first of two lines on the
+bar, and F06 and F07 are faulty exports where the bar sits across the middle of the line with a
+dead layer reading *and regulate your fear* underneath. F01 is a bare portrait with no call to
+action on it and is left alone.
 
 **Ad footer** — on every static ad the signature strip (ensō mark, name, role line, both dojo
 crests) is drawn 1.3× the reel-cover size (`AD_SIG` in `app.js`), with its top edge where the

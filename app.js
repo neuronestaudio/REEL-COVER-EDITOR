@@ -2614,6 +2614,30 @@ function bindBlocks() {
   renderBlocks();
 }
 
+/* The one call to action the client submission goes out with. Change it here (or
+   with "Submission CTA" on the set card) and every board in the set is laid out
+   again with it; bump FINAL_CTA_REV to push a new line to browsers that already
+   hold the set. */
+const FINAL_CTA = 'If this resonates, learn more here';
+const FINAL_CTA_REV = 'cta-1';
+/* The lines the boards in the submission were exported with, read off the
+   pictures themselves (final.js `ctaNow`) rather than the brief, because several
+   were edited in the studio before they were exported. De-duplicated, and any
+   that merely repeat one of the brief's eight are dropped. */
+const ctaKey = s => (s || '').toLowerCase().replace(/\s+/g, ' ').replace(/[.,]+$/, '').trim();
+function submissionCtas() {
+  const seen = new Set(), out = [];
+  (rtsAds().ctas || []).forEach(c => { seen.add(ctaKey(c.line)); seen.add(ctaKey(c.button)); });
+  (rtsFinal().boards || []).forEach(b => {
+    const k = ctaKey(b.ctaNow); if (!k || seen.has(k)) return;
+    seen.add(k);
+    const button = b.ctaNow.length <= 46;      // a short one is a button, a long one a positioning line
+    out.push({ id: 'SUB ' + String(out.length + 1).padStart(2, '0'), from: 'submission',
+      line: button ? '' : b.ctaNow, button: button ? b.ctaNow : '' });
+  });
+  return out;
+}
+
 /* ---------------- CTA badges ----------------
    One-click CTAs: a positioning line and, optionally, a button. The eight lines from
    Harrison's static ad brief are built in (ads.js); badges saved from the Line and
@@ -2653,23 +2677,81 @@ async function placeCta(name, line, button) {
   }
   pasteBlock(name, withSize(doc, () => ctaBadgeLayers(line, button)));
 }
+/* Each line is shown in full rather than as a number, because picking one meant
+   opening "CTA 01", "CTA 02"… in turn to find out what they said. */
 function renderCtas() {
   const c = $('#ctaList'); if (!c) return; c.innerHTML = '';
+  const cur = ctaKey($('#ctaLine') ? $('#ctaLine').value : '') || ctaKey($('#ctaBtn') ? $('#ctaBtn').value : '');
+  const group = t => { const g = document.createElement('div'); g.className = 'ctaGrp'; g.textContent = t; c.appendChild(g); };
   const add = (b, own) => {
-    const el = document.createElement('button'); el.className = 'chip'; el.type = 'button';
-    el.title = `${b.line}${b.button ? `\n[ ${b.button} ]` : ''}\n\nClick to put it on this cover`;
-    el.append(own ? b.name + ' ' : b.name);
+    const el = document.createElement('button'); el.className = 'ctaRow'; el.type = 'button';
+    el.setAttribute('aria-current', !!cur && (ctaKey(b.line) === cur || ctaKey(b.button) === cur));
+    el.title = `${b.line || b.button}${b.line && b.button ? `\n[ ${b.button} ]` : ''}\n\nClick to put it on this board`;
+    const t = document.createElement('span'); t.className = 't';
+    t.textContent = b.line || b.button || '(empty)';
+    if (b.line && b.button) { const s = document.createElement('span'); s.className = 'b'; s.textContent = b.button; t.append(document.createElement('br'), s); }
+    el.appendChild(t);
+    if (b.id) { const u = document.createElement('span'); u.className = 'u'; u.textContent = b.id; el.appendChild(u); }
     if (own) {
-      el.style.borderColor = 'var(--accent)';
-      const x = document.createElement('span'); x.textContent = '✕'; x.title = 'Delete this badge'; x.style.opacity = '.6';
+      const x = document.createElement('button'); x.className = 'del'; x.type = 'button'; x.textContent = '✕'; x.title = 'Delete this badge';
       x.onclick = e => { e.stopPropagation(); if (!confirm(`Delete the CTA badge “${b.name}”?`)) return; settings.ctaBadges = settings.ctaBadges.filter(o => o.id !== b.id); saveSettingsSoon(); renderCtas(); };
       el.appendChild(x);
     }
-    el.onclick = () => { $('#ctaLine').value = b.line || ''; $('#ctaBtn').value = b.button || ''; placeCta(b.name, b.line, b.button); };
+    el.onclick = () => { $('#ctaLine').value = b.line || ''; $('#ctaBtn').value = b.button || ''; placeCta(b.name || b.id || 'CTA', b.line, b.button); renderCtas(); };
     c.appendChild(el);
   };
-  builtinCtas().forEach(b => add(b, false));
-  (settings.ctaBadges || []).forEach(b => add(b, true));
+  group('The submission CTA');
+  add({ id: 'SUBMISSION', name: 'Submission CTA', line: '', button: FINAL_CTA }, false);
+  const sub = submissionCtas();
+  const brief = builtinCtas();
+  if (brief.length) { group(`From the brief · ${brief.length}`); brief.forEach(b => add(b, false)); }
+  if (sub.length) { group(`Used in the submission · ${sub.length}`); sub.forEach(b => add(b, false)); }
+  const own = settings.ctaBadges || [];
+  if (own.length) { group(`Saved here · ${own.length}`); own.forEach(b => add(b, true)); }
+}
+/* A board in the submission is a finished picture with the old call to action
+   printed on it, so the new one is laid over the top: a bar the exact size of the
+   old one in the same vermilion, with the line centred on it. final.js carries
+   that rectangle (`cta`) for every board, measured from the picture. */
+function finalCtaLayers(box, text) {
+  const t = (text || '').trim(); if (!t || !box) return [];
+  const bw = box.w * W, room = bw - Math.min(96, bw * 0.14);
+  const probe = measureCtx();
+  const width = s => { const l = newText({ font: RTS.font, weight: 600, size: s, track: 0.2, line: 1.2, upper: true, text: t }); probe.font = fontString(l); probe.letterSpacing = `${0.2 * s}px`; return probe.measureText(t.toUpperCase()).width; };
+  let size = Math.min(26, Math.max(13, Math.round(box.h * 0.42)));
+  while (size > 12 && width(size) > room) size--;
+  const rule = newRule({ x: box.x, y: box.y, width: box.w, thick: box.h, color: RTS.red, alpha: 1 });
+  const cta = newText({ font: RTS.font, align: 'center', x: box.x, width: box.w, text: t, weight: 600, size,
+    track: 0.2, line: 1.2, upper: true, color: RTS.white, shadow: 0, box: 'none', outline: 0, behind: false });
+  cta.y = (box.y * H - size * 1.2 / 2) / H;
+  rule.role = 'finalcta'; cta.role = 'finalcta';
+  return [rule, cta];
+}
+async function applyFinalCta(text) {
+  const recs = covers.filter(c => c.doc && c.doc.ad && c.doc.ad.setKey === FINAL_KEY);
+  if (!recs.length) return 0;
+  if (!(await adFontsReady())) { toast('Fraunces is still loading — try again in a moment'); return 0; }
+  const byId = new Map((rtsFinal().boards || []).map(b => [b.id, b]));
+  let n = 0;
+  for (const r of recs) {
+    const b = byId.get(r.doc.ad.id); if (!b || !b.cta) continue;   // f01 carries no call to action
+    const d = r.id === doc?.id ? doc : r.doc;
+    d.layers = (d.layers || []).filter(l => l.role !== 'finalcta');
+    d.layers.push(...withSize(d, () => finalCtaLayers(b.cta, text)));
+    d.updatedAt = r.updatedAt = Date.now(); r.doc = d; n++;
+  }
+  await store.saveCovers(recs);
+  settings.finalCtaText = text; saveSettingsSoon();
+  renderAll(); renderAds(); renderCtas();
+  return n;
+}
+async function seedFinalCta() {
+  if (settings.finalCtaRev === FINAL_CTA_REV) return false;
+  const n = await applyFinalCta(FINAL_CTA);
+  if (!n) return false;
+  settings.finalCtaRev = FINAL_CTA_REV;
+  await store.saveSettings(settings).catch(() => {});
+  return true;
 }
 function bindCtas() {
   $('#ctaAdd').onclick = () => placeCta('CTA', $('#ctaLine').value, $('#ctaBtn').value);
@@ -3333,8 +3415,21 @@ function adCard(g) {
     + `<h3>${escapeHtml(g.title)}${g.final ? '<em>CLIENT SUBMISSION</em>' : ''}</h3>`
     + (g.note ? `<p class="insight">${escapeHtml(g.note)}</p>` : '');
   const acts = document.createElement('div'); acts.className = 'acts';
-  acts.innerHTML = `<button class="small${g.final ? ' primary' : ''}">${g.final ? 'Export submission' : 'Export set'}</button><button class="small ghost">+ Board</button>`;
-  const [exp, add] = $$('button', acts);
+  acts.innerHTML = `<button class="small${g.final ? ' primary' : ''}">${g.final ? 'Export submission' : 'Export set'}</button>`
+    + (g.final ? '<button class="small ghost">Submission CTA</button>' : '')
+    + '<button class="small ghost">+ Board</button>';
+  const btns = $$('button', acts); const exp = btns.shift();
+  if (g.final) {
+    const cta = btns.shift();
+    cta.title = 'One call to action across every board in the submission';
+    cta.onclick = async () => {
+      const t = (prompt('The call to action on every board in the submission:', settings.finalCtaText || FINAL_CTA) || '').trim();
+      if (!t) return;
+      const n = await applyFinalCta(t);
+      toast(n ? `“${t}” is on ${n} board${n === 1 ? '' : 's'}` : 'No board in the set carries a call to action');
+    };
+  }
+  const add = btns.shift();
   exp.onclick = () => exportAdSet(g); add.onclick = () => newAdBoard(g);
   head.append(meta, acts); el.appendChild(head);
   if (g.final) el.classList.add('final');
@@ -4237,6 +4332,7 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   if (settings.adSet !== AD_SET || settings.adLayout !== AD_LAYOUT) { try { await seedAdSet(); } catch (e) { console.warn('ad set', e); } }
   if (settings.adLines !== 2) { try { await fixAdLines(); } catch (e) { console.warn('ad lines', e); } }
   if (FINAL_SET && settings.finalSet !== FINAL_SET) { try { await seedFinalSet(); } catch (e) { console.warn('final set', e); } }
+  try { await seedFinalCta(); } catch (e) { console.warn('final cta', e); }
   if (settings.adSig !== AD_SIG) { try { await enlargeAdSigs(); } catch (e) { console.warn('ad footer', e); } }
   const todo = location.hash === '#todo';
   if (todo && settings.reelSet !== REEL_SET) { try { await seedReelSet(); } catch (e) { console.warn('reel set', e); } }
