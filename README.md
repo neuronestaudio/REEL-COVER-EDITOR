@@ -184,6 +184,47 @@ size chosen in the header.
 
 **Export** — 1080×1920 or 2160×3840 PNG, JPG, the selected covers, or a ZIP of every cover.
 
+**Organise: albums, favourites, labels** — every tile in the studio (a cover in the rail, a
+carousel slide, a static ad board) carries the same corner controls: a star, a ⋯ menu and, in
+Select mode, a tick. The bar above each list filters by **★ Favourites**, by **album** and by
+**label** (seven colours, named by double-clicking a dot: Redo, Review, Approved, Hero, Idea,
+Client, Archive to begin with). **+ Album** makes an album; drag any tile onto an album chip to
+file it, right-click the chip to rename, recolour or delete it (its contents stay). The ⋯ menu on
+a tile — or a right-click — does favourite, label, album, duplicate, export and **delete** for
+that one item; on a carousel card it acts on every slide. **Shift+click** tiles (or turn on
+Select) to pick several, then the bar offers favourite, label, move, export and delete for the
+lot; `Delete` on the keyboard does the same, `Esc` clears. Deleting a slide renumbers the rest of
+its carousel; duplicating a board keeps it in its set with a lettered id. The marks live on the
+record (`rec.fav`, `rec.album`, `rec.label`), not in the document, so restoring a version or
+pasting a doc never moves anything; albums and label names live in settings. Back up carries them.
+
+**Break down a picture** — a finished poster, ad or screenshot comes apart into the editor's
+own layers. Open it from **Break down…** in the Background panel (on the photo in use, or a file),
+**From picture** in the Covers panel, or **+ From a picture** on the Carousel posts and Static
+Ads tabs, or drop a picture on the dialog. On-device, nothing uploaded:
+
+- the **words** are read off the pixels with Tesseract (loaded from jsdelivr on first use, then
+  cached by the browser) and become text layers — size from the line height and the letters
+  present, colour sampled from the glyphs, alignment from the line edges, weight from the stem
+  width, a serif or sans guess from the stroke contrast, the line breaks kept; words sitting on
+  their own box (a button) come out as a thick rule under a text layer, the way the CTA button is
+  built;
+- the **person** goes through the same MediaPipe model as the Cutout tab and becomes the movable
+  subject cutout (skipped when the mask is sparse or low-confidence, so a poster with nobody in it
+  does not grow a phantom);
+- **marks and rules** — things that differ from the ground around them, sit on flat colour and
+  are not words or the subject — become logo and rule layers (on a photograph the test is much
+  stricter, since picture detail is not a mark);
+- what is left, with every element patched out (a breadth-first fill from the surrounding pixels,
+  softened), becomes the **background plate**; *Fill behind subject* also fills in behind the
+  cutout with a defocused version of the ground so it can move without a ghost.
+
+Everything found is boxed on the preview and listed with a checkbox; untick anything to leave it
+in the plate. **Make it** chooses the result: Auto (a tall picture becomes a reel cover, a 4:5 or
+square one a static ad board in the **Imported boards** set), Cover, Static ad, Slide, or the
+open document itself (one undo step). The plate fills the frame the way any uploaded background
+does, and every position is mapped through that same fit.
+
 ## Storage
 
 Cover documents and settings live in `localStorage`; uploaded images and cutouts live in
@@ -220,7 +261,7 @@ directory `.`.
 
 ```
 index.html   markup and styles
-app.js       renderer, editor, storage, export
+app.js       renderer, editor, storage, export, organiser (albums/favourites/labels), Break down a picture
 assets/      shipped photo, studio-grade cutout, mosaic source
 assets/stills/  day-1 REEL COVER stills (the default batch photo set)
 captions.js  the 72 cover captions, with hand-set line breaks
@@ -231,4 +272,4 @@ vendor/      JSZip (ZIP export)
 vercel.json  cache headers
 ```
 
-Third-party at runtime: Google Fonts only. JSZip is vendored in `vendor/`.
+Third-party at runtime: Google Fonts, and Tesseract.js from jsdelivr the first time Break down a picture is used. JSZip is vendored in `vendor/`.

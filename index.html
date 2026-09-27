@@ -376,6 +376,102 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
   .phone{width:100%;max-width:390px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* ---------- organiser: albums, favourites, labels, selection ---------- */
+.orgbar{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}
+.orgbar.compact{margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.orgrow{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.orgbar .chip i{font-style:normal;opacity:.6;margin-left:4px;font-size:10.5px}
+.orgbar .chip.alb{border-left:3px solid var(--alb);padding-left:7px}
+.orgbar .chip.alb[aria-pressed=true]{background:var(--alb);border-color:var(--alb);color:#16150f}
+.orgbar .chip.drop{outline:2px dashed var(--accent);outline-offset:1px;background:var(--raised);color:var(--text)}
+.orgbar .drop-out{display:none;border-style:dashed;color:var(--dim);cursor:default}
+body.org-drag .orgbar .drop-out{display:inline-block}
+.orgbar .ghostchip{border-style:dashed;color:var(--dim)}
+.orgbar .ghostchip:hover{color:var(--text)}
+.orglabels{display:inline-flex;gap:5px;align-items:center;margin-left:4px;padding-left:8px;border-left:1px solid var(--line)}
+.labdot{width:16px;height:16px;border-radius:50%;padding:0;border:2px solid transparent;background:var(--lab);opacity:.5;font:700 8px var(--font-mono);color:#16150f;display:grid;place-items:center;line-height:1}
+.labdot:hover{opacity:.9;background:var(--lab)}
+.labdot[aria-pressed=true]{opacity:1;border-color:var(--text);box-shadow:0 0 0 1px var(--lab)}
+.labdot i{font-style:normal}
+.orgbar .selchip[aria-pressed=true]{background:var(--teal);border-color:var(--teal);color:#0d2413}
+.orgsel{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:7px 10px;border:1px solid var(--teal);border-radius:8px;background:rgba(127,179,166,.08)}
+.orgsel b{font-size:12px;margin-right:4px;color:var(--teal)}
+.orgsel .danger{color:var(--bad);border-color:rgba(224,122,106,.4)}
+.orgbar.compact .orgsel{padding:5px 7px}
+/* the corner controls on a tile or a row */
+.pslide{position:relative}
+.orgacts{position:absolute;top:4px;right:4px;display:flex;gap:2px;z-index:2;opacity:0;transition:opacity .12s}
+.pslide:hover .orgacts,.pslide.fav .orgacts,.pslide.selected .orgacts,body.org-select .pslide .orgacts{opacity:1}
+.orgacts button{width:20px;height:20px;padding:0;border-radius:4px;background:rgba(0,0,0,.72);border-color:transparent;color:#f1ecdf;font-size:11px;line-height:1;display:grid;place-items:center}
+.orgacts button:hover{background:rgba(0,0,0,.92);border-color:var(--line-2)}
+.orgacts .star[aria-pressed=true]{color:var(--accent)}
+.orgacts .tick{color:var(--dim)}
+.pslide.fav:not(:hover):not(.selected) .orgacts .more,.pslide.fav:not(:hover):not(.selected) .orgacts .tick{display:none}
+body.org-select .orgacts .tick{display:grid!important}
+[data-org-id].selected .orgacts .tick{background:var(--teal);color:#0d2413}
+.pslide.selected .tile{outline:3px solid var(--teal);outline-offset:-1px}
+.orgtag{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap}
+.orgtag span{font:600 9px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:99px;border:1px solid var(--line);color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.orgtag .alb{border-color:var(--alb);color:var(--alb)}
+.orgtag .lab{background:var(--lab);color:#16150f;border-color:var(--lab)}
+.pslide[data-label] .tile::after{content:'';position:absolute;left:0;right:0;bottom:0;height:4px;background:var(--lab)}
+[data-org-id].dragging{opacity:.4}
+/* the same controls on a row in the editor rail */
+.cover-item{grid-template-columns:38px 1fr auto auto;position:relative}
+.cover-item .orgacts{position:static;opacity:1}
+.cover-item .orgacts button{background:transparent;color:var(--dim)}
+.cover-item .orgacts button:hover{background:var(--ink);color:var(--text)}
+.cover-item .orgacts .star[aria-pressed=true]{color:var(--accent)}
+.cover-item .orgacts .tick{display:none}
+body.org-select .cover-item .orgacts .tick{display:grid!important}
+.cover-item .orgtag{display:none}
+.cover-item>*{min-width:0}
+.cover-item .orgacts button{width:18px;height:18px}
+aside.left{overflow-x:hidden}
+aside.left .sec h3 .acts{flex-wrap:wrap;justify-content:flex-end}
+.cover-item[data-label]{box-shadow:inset 3px 0 0 var(--lab)}
+.cover-item.selected{background:rgba(127,179,166,.12);box-shadow:inset 0 0 0 1px var(--teal)}
+.cover-item.selected[data-label]{box-shadow:inset 0 0 0 1px var(--teal),inset 3px 0 0 var(--lab)}
+/* popover menu */
+.orgmenu{position:fixed;z-index:60;min-width:210px;max-height:70vh;overflow:auto;background:var(--panel);border:1px solid var(--line-2);border-radius:10px;padding:5px;box-shadow:0 18px 50px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:1px}
+.orgmenu button{display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:center;text-align:left;background:transparent;border-color:transparent;padding:6px 8px;font-size:12.5px;border-radius:6px;width:100%}
+.orgmenu button:hover{background:var(--raised);border-color:transparent}
+.orgmenu button.danger{color:var(--bad)}
+.orgmenu button b{color:var(--teal);font-size:11px}
+.orgmenu .dot{width:11px;height:11px;border-radius:50%;display:block;margin:auto}
+.orgmenu .ic{font-style:normal;text-align:center;color:var(--dim);font-size:12px}
+.orgmenu .orgmenu__head{font:10px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim);padding:7px 8px 3px}
+.orgmenu hr{margin:4px 0}
+/* ---------- deconstruct: a picture broken into layers ---------- */
+dialog.decon{border:1px solid var(--line-2);border-radius:14px;background:var(--panel);color:var(--text);padding:0;width:min(1180px,94vw);height:min(820px,92vh);box-shadow:0 40px 120px rgba(0,0,0,.7);font:14px/1.45 var(--font-ui)}
+dialog.decon::backdrop{background:rgba(6,5,3,.72);backdrop-filter:blur(3px)}
+dialog.decon.filedrop{outline:3px dashed var(--accent);outline-offset:-6px}
+.decon__wrap{display:grid;grid-template-columns:1fr 372px;height:100%;margin:0}
+.decon__stage{position:relative;display:grid;place-items:center;background:#0d0c08;border-right:1px solid var(--line);border-radius:14px 0 0 14px;overflow:hidden;min-height:0;padding:12px}
+.decon__stage canvas{display:block;max-width:100%;max-height:100%;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.decon__drop{position:absolute;inset:16px;display:grid;place-items:center;text-align:center;border:1px dashed var(--line-2);border-radius:10px;color:var(--muted);font-size:13.5px;line-height:1.8;background:#0d0c08}
+.decon__drop b{display:block;font-family:var(--font-display);font-size:24px;color:var(--text);font-weight:500;margin-bottom:6px}
+.decon__side{display:flex;flex-direction:column;min-height:0;padding:16px 16px 14px;gap:10px}
+.decon__side h2{margin:0;font:500 21px var(--font-display);letter-spacing:-.01em}
+.decon__lede{margin:0;color:var(--muted);font-size:12.5px;line-height:1.5}
+.decon__side .row{margin:0}
+.decon__side .row>label{flex:0 0 52px}
+.decon__note{font:11px var(--font-mono);color:var(--dim);min-height:14px}
+.decon__status{padding:7px 10px;border-radius:8px;background:var(--ink);border:1px solid var(--line);color:var(--muted);font-size:11px;line-height:1.5}
+.decon__status.ok{color:var(--good)}
+.decon__status.warn{color:var(--accent)}
+.decon__list{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:3px;border-top:1px solid var(--line);padding-top:8px}
+.decel{display:grid;grid-template-columns:auto auto 1fr auto;gap:8px;align-items:center;padding:6px 8px;border-radius:8px;border:1px solid transparent;cursor:pointer;border-left:3px solid var(--k)}
+.decel:hover,.decel.hot{background:var(--raised);border-color:var(--line);border-left-color:var(--k)}
+.decel.off{opacity:.5}
+.decel .k{font:600 9.5px var(--font-mono);letter-spacing:.08em;color:var(--k);white-space:nowrap}
+.decel .body{min-width:0}
+.decel .body b{display:block;font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.decel .body small{display:block;color:var(--dim);font-size:10.5px;font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.decel .sw{width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,.15);display:block}
+.decel input{accent-color:var(--accent);margin:0}
+.decon__acts{display:flex;gap:6px;align-items:center;padding-top:8px;border-top:1px solid var(--line)}
+.decon__acts .grow{flex:1}
 </style>
 </head>
 <body>
@@ -409,7 +505,7 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
 <section class="view active" id="view-editor">
   <aside class="left">
     <div class="sec">
-      <h3><span id="coverListTitle">Covers</span> <span class="acts"><button class="small" id="btnBackup" title="Download every cover and image as one JSON file">Back up</button><button class="small" id="btnRestore" title="Load a backup file">Restore</button><button class="small go" id="btnNew">+ New</button></span></h3>
+      <h3><span id="coverListTitle">Covers</span> <span class="acts"><button class="small" id="btnBackup" title="Download every cover and image as one JSON file">Back up</button><button class="small" id="btnRestore" title="Load a backup file">Restore</button><button class="small" id="btnCoverFromImage" title="Break a finished picture into editable layers and make it a cover">From picture</button><button class="small go" id="btnNew">+ New</button></span></h3>
       <div class="covers" id="coverList"></div>
       <div class="row" style="margin:6px 0 0"><span class="mono pickCount" style="color:var(--dim);font-size:10.5px;flex:1">none selected</span><button class="small btnExportPicked" disabled title="Export the ticked covers — one as a PNG, more as a ZIP">Export selected</button><button class="small ghost btnPickNone" title="Untick every cover">Clear</button></div>
     </div>
@@ -466,7 +562,7 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
     </div>
 
     <div class="sec">
-      <h3>Background <span class="acts"><button class="small primary" id="bgUpload">+ Upload image</button></span></h3>
+      <h3>Background <span class="acts"><button class="small" id="bgDeconstruct" title="Break the picture into editable layers: its words, the person, any marks, and a clean plate behind them">Break down…</button><button class="small primary" id="bgUpload">+ Upload image</button></span></h3>
       <div class="chips" id="bgType">
         <button class="chip" data-v="image" aria-pressed="true">Photo</button>
         <button class="chip" data-v="solid">Solid</button>
@@ -746,11 +842,13 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
         <p>Meta carousels at 1080 × 1350, three slides each: the hook, the practice, then the event. Open a slide to edit it with the same tools as a cover. The note under each slide is the art direction, not copy for the poster.</p>
       </div>
       <div class="acts">
+        <button class="small" id="btnPostFromImage" title="Break a finished picture into editable layers and make it a slide">+ From a picture</button>
         <button class="small" id="btnNewCarousel">+ New carousel</button>
         <button class="small" id="btnExportCarousels">Export every carousel</button>
       </div>
     </div>
     <div class="pchips" id="postChips"></div>
+    <div id="postOrg"></div>
     <div id="postList"></div>
     <div id="postEmpty" hidden>No carousels yet. <b>+ New carousel</b> starts one.</div>
   </div>
@@ -762,13 +860,15 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
     <div class="postbar">
       <div>
         <h2>Static Ads</h2>
-        <p>The Return to Self static boards at the Meta feed frame, 1080 × 1350 (4:5). Open a board to change the words, drag the elements or swap the picture from the photo library (the Day 1 stills are in there); a square or story version of any board is one click. Lines marked ~ are trimmed or paraphrased and need Harrison’s sign-off.</p>
+        <p>The Return to Self static boards at the Meta feed frame, 1080 × 1350 (4:5). Open a board to change the words, drag the elements or swap the picture from the photo library (the Day 1 stills are in there); a square or story version of any board is one click. Lines marked ~ are trimmed or paraphrased and need Harrison’s sign-off. Star a board, give it a label, or drag it onto an album to keep the set in order; Shift+click picks several.</p>
       </div>
       <div class="acts">
+        <button class="small" id="btnAdFromImage" title="Break a finished ad or poster into editable layers and make it a board">+ From a picture</button>
         <button class="small" id="btnExportAds">Export every set</button>
       </div>
     </div>
     <div class="pchips" id="adChips"></div>
+    <div id="adOrg"></div>
     <div id="adList"></div>
     <div id="adEmpty" hidden>No static ads yet.</div>
   </div>
@@ -898,6 +998,39 @@ kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line-2);b
   </div>
 </section>
 
+<!-- Break down a picture: OCR + subject + marks → editable layers on a clean plate -->
+<dialog id="decon" class="decon">
+  <div class="decon__wrap">
+    <div class="decon__stage" id="deconStage">
+      <canvas id="deconCanvas" width="540" height="720"></canvas>
+      <div class="decon__drop" id="deconDrop"><div><b>Break down a picture</b>Drop a finished poster, ad or screenshot here<br>or <button type="button" class="small" id="deconPick">choose a file</button></div></div>
+    </div>
+    <aside class="decon__side">
+      <h2>Break down a picture</h2>
+      <p class="decon__lede">The words are read off the pixels and become text layers, the person becomes the movable cutout, marks on flat ground become logo layers, and what is left — patched clean — becomes the background plate.</p>
+      <div class="row"><label>Make it</label><div class="ctl chips" id="deconTarget">
+        <button type="button" class="chip" data-v="auto" aria-pressed="true">Auto</button>
+        <button type="button" class="chip" data-v="cover" title="A 1080 × 1920 reel cover">Cover</button>
+        <button type="button" class="chip" data-v="ad" title="A static ad board at the nearest Meta frame">Static ad</button>
+        <button type="button" class="chip" data-v="slide" title="A one-slide carousel at 1080 × 1350">Slide</button>
+        <button type="button" class="chip" data-v="apply" title="Replace the open document's picture and layers with the result">Open doc</button>
+      </div></div>
+      <div class="row"><label>Plate</label><div class="ctl chips" id="deconPlate">
+        <button type="button" class="chip" data-v="keep" aria-pressed="true" title="The photo stays as it is under the cutout">Photo as is</button>
+        <button type="button" class="chip" data-v="fill" title="Blur the ground in behind the subject, so the cutout can move without a ghost">Fill behind subject</button>
+      </div></div>
+      <div class="decon__note" id="deconTargetNote"></div>
+      <div class="decon__status mono" id="deconStatus">Drop a picture, or choose a file</div>
+      <div class="decon__list" id="deconList"></div>
+      <div class="decon__acts">
+        <button type="button" class="small ghost" id="deconAgain" disabled title="Run the analysis again">Analyse again</button>
+        <span class="grow"></span>
+        <button type="button" class="small" id="deconCancel">Cancel</button>
+        <button type="button" class="small primary" id="deconBuild" disabled>Build layers</button>
+      </div>
+    </aside>
+  </div>
+</dialog>
 <div id="toast" role="status"></div>
 <input type="file" id="fileInput" accept="image/*" hidden>
 

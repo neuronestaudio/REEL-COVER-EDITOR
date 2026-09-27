@@ -641,6 +641,7 @@ async function persistCurrent(withVersion) {
   catch (e) { console.warn(e); setStatus('save failed', 'warn'); }
   renderCoverList(); renderVersions(); renderGrid();
   if ($('#view-posts').classList.contains('active')) renderPosts();
+  if ($('#view-ads').classList.contains('active')) renderAds();
 }
 
 /* ---------------- editor UI ---------------- */
@@ -1481,7 +1482,7 @@ function lazyCanvas(d, cssW) {
 function renderCoverList() {
   const c = $('#coverList'); c.innerHTML = '';
   const inPost = isPost(doc), inAd = isAd(doc);
-  const list = inPost
+  let list = inPost
     ? covers.filter(r => r.doc?.post?.cid === doc.post.cid).sort((a, b) => (a.doc.post.slide || 0) - (b.doc.post.slide || 0))
     : inAd ? ((adGroups().find(g => g.key === doc.ad.setKey) || {}).boards || [])
     : covers.filter(r => !isFeed(r.doc)).sort((a, b) => b.updatedAt - a.updatedAt);
@@ -1492,19 +1493,19 @@ function renderCoverList() {
     back.onclick = () => { const r = [...covers].filter(x => !isFeed(x.doc)).sort((a, b) => b.updatedAt - a.updatedAt)[0]; if (r) loadDoc(r.doc); };
     c.appendChild(back);
   }
-  if (!list.length) c.innerHTML = '<div class="empty">No covers yet.</div>';
+  if (!inPost && !inAd) c.appendChild(orgBar('covers', true));
+  const of = orgFilter('covers');
+  if (!inPost && !inAd && orgActive(of)) list = list.filter(r => orgMatch(r, of));
+  if (!list.length) c.insertAdjacentHTML('beforeend', `<div class="empty">${orgActive(of) && !inPost && !inAd ? 'Nothing here matches the filter.' : 'No covers yet.'}</div>`);
   list.forEach(r => {
     const d = document.createElement('div'); d.className = 'cover-item'; d.setAttribute('aria-current', r.id === doc?.id); d.dataset.id = r.id; d.classList.toggle('picked', picked.has(r.id));
     const rs = sizeOf(r.doc);
     const th = lazyCanvas(r.id === doc?.id ? doc : r.doc, 38 * 2); th.style.width = '38px'; th.style.height = Math.round(38 * rs.h / rs.w) + 'px';
     d.appendChild(th);
     const info = document.createElement('div'); info.innerHTML = `<div class="nm">${escapeHtml(r.name)}</div><div class="meta">${fmtTime(r.updatedAt)} · ${(r.versions || []).length} ver</div>`; d.appendChild(info);
-    const acts = document.createElement('div'); acts.innerHTML = `<input type="checkbox" class="pick" title="Select for export"><button class="icon small ghost" title="Duplicate">⧉</button><button class="icon small ghost" title="Delete">✕</button>`;
+    const acts = document.createElement('div'); acts.innerHTML = `<input type="checkbox" class="pick" title="Tick for Export selected">`;
     const cb = $('input', acts); cb.checked = picked.has(r.id); cb.onclick = e => { e.stopPropagation(); togglePick(r.id, cb.checked); };
-    const [dup, del] = $$('button', acts);
-    dup.onclick = async e => { e.stopPropagation(); const nd = JSON.parse(JSON.stringify(r.id === doc.id ? doc : r.doc)); nd.id = uid(); nd.name = r.name + ' copy'; nd.createdAt = Date.now(); loadDoc(nd); await persistCurrent(); };
-    del.onclick = async e => { e.stopPropagation(); if (!confirm(`Delete “${r.name}” and its history?`)) return; await store.deleteCover(r.id); covers = covers.filter(x => x.id !== r.id); settings.gridOrder = (settings.gridOrder || []).filter(x => x !== r.id); await store.saveSettings(settings); if (r.id === doc.id) { if (covers[0]) loadDoc(covers[0].doc); else newCover(); } renderCoverList(); renderGrid(); };
-    d.appendChild(acts); d.onclick = () => { if (r.id !== doc.id) loadDoc(r.doc); }; c.appendChild(d);
+    d.appendChild(acts); orgDecor(d, r, inPost ? 'posts' : inAd ? 'ads' : 'covers'); d.onclick = () => { if (r.id !== doc.id) loadDoc(r.doc); }; c.appendChild(d);
   });
 }
 function renderVersions() {
@@ -2896,7 +2897,10 @@ function renderPosts() {
     b.onclick = () => { postFilter = v; renderPosts(); };
     cc.appendChild(b);
   });
+  const og = $('#postOrg'); if (og) { og.innerHTML = ''; og.appendChild(orgBar('posts')); }
+  const of = orgFilter('posts');
   all.filter(g => postFilter === 'all' || (postFilter === 'top' ? !!g.pick : g.category === postFilter))
+    .filter(g => !orgActive(of) || g.slides.some(r => orgMatch(r, of)))
     .forEach(g => wrap.appendChild(postCard(g)));
 }
 function postCard(g) {
@@ -2908,11 +2912,12 @@ function postCard(g) {
     + (g.pick ? `<p class="why">Why shortlist: ${escapeHtml(g.pick)}</p>` : '');
   const acts = document.createElement('div'); acts.className = 'acts';
   acts.innerHTML = (g.caption ? '<button class="small ghost">Copy caption</button>' : '')
-    + '<button class="small">Export carousel</button><button class="small ghost">Duplicate</button><button class="small ghost">Delete</button>';
+    + '<button class="small">Export carousel</button><button class="small ghost">Duplicate</button><button class="small ghost">Delete</button><button class="small ghost" title="Favourite, label or album — for the whole carousel">⋯</button>';
   const btns = $$('button', acts);
   if (g.caption) { const cap = btns.shift(); cap.onclick = () => { navigator.clipboard.writeText(g.caption).then(() => toast('Caption copied'), () => toast('Could not copy')); }; }
-  const [exp, dup, del] = btns;
+  const [exp, dup, del, more] = btns;
   exp.onclick = () => exportCarousel(g); dup.onclick = () => duplicateCarousel(g); del.onclick = () => deleteCarousel(g);
+  more.onclick = () => orgMenu(more, orgMenuItems(g.slides));
   head.append(meta, acts); el.appendChild(head);
   const row = document.createElement('div'); row.className = 'pslides';
   g.slides.forEach(r => row.appendChild(postSlideTile(r)));
@@ -2931,7 +2936,7 @@ function postSlideTile(r) {
   b.onclick = () => { loadDoc(live); switchView('editor'); };
   const cap = document.createElement('div'); cap.className = 'cap';
   cap.innerHTML = `<b>${escapeHtml(POST_STYLE_NAME[p.style] || 'Slide')}</b>${escapeHtml(p.visual || '')}`;
-  el.append(b, cap); return el;
+  el.append(b, cap); orgDecor(el, r, 'posts'); return el;
 }
 const carouselFile = g => `${String(g.n || 0).padStart(2, '0')}-${slug(g.title)}`;
 const slideDocs = g => g.slides.map(r => r.id === doc?.id ? doc : r.doc);
@@ -3238,7 +3243,7 @@ function adGroups() {
     let g = by.get(a.setKey);
     if (!g) {
       const meta = (cfg.sets || []).find(s => s.key === a.setKey) || {};
-      by.set(a.setKey, g = { key: a.setKey, title: meta.title || `Static set ${a.setKey}`, date: meta.date || '', note: meta.note || '', ver: meta.ver || a.ver || '01', boards: [] });
+      by.set(a.setKey, g = { key: a.setKey, title: meta.title || (a.setKey === 'imported' ? 'Imported boards' : `Static set ${a.setKey}`), date: meta.date || '', note: meta.note || (a.setKey === 'imported' ? 'Pictures broken down into layers with Break down a picture. Each board is an ordinary editable ad.' : ''), ver: meta.ver || a.ver || '01', boards: [] });
     }
     g.boards.push(c);
   }
@@ -3263,8 +3268,11 @@ function renderAds() {
     b.onclick = () => { adFilter = v; renderAds(); };
     cc.appendChild(b);
   });
+  const og = $('#adOrg'); if (og) { og.innerHTML = ''; og.appendChild(orgBar('ads')); }
+  const of = orgFilter('ads');
   all.filter(g => adFilter === 'all' || adFilter === 'flag' || g.key === adFilter)
     .map(g => adFilter === 'flag' ? { ...g, boards: g.boards.filter(r => r.doc.ad.flag) } : g)
+    .map(g => orgActive(of) ? { ...g, boards: g.boards.filter(r => orgMatch(r, of)) } : g)
     .filter(g => g.boards.length)
     .forEach(g => wrap.appendChild(adCard(g)));
 }
@@ -3297,7 +3305,7 @@ function adTile(r, have) {
   cap.innerHTML = `<b>${escapeHtml(fr.label)}${a.pair ? ' · with ' + escapeHtml(a.pair) : ''}${a.ctaRef ? ' · ' + escapeHtml(a.ctaRef) : ''}</b>${escapeHtml(a.name)}`
     + (a.dir ? `<span class="dir">${escapeHtml(a.dir)}</span>` : '')
     + (a.flag ? `<span class="flag">~ ${escapeHtml(a.flag)}</span>` : '');
-  el.append(b, cap);
+  el.append(b, cap); orgDecor(el, r, 'ads');
   if (a.frame === '4x5') {
     const vars = document.createElement('div'); vars.className = 'vars';
     for (const [k, f] of Object.entries(AD_FRAMES)) {
@@ -3370,6 +3378,767 @@ async function newAdBoard(g) {
 }
 $('#btnExportAds').onclick = () => exportAllAds();
 
+/* ---------------- organiser ----------------
+   Albums, favourites and colour labels over every document in the studio —
+   covers, carousel slides and static ad boards alike — plus delete, duplicate
+   and multi-select straight from a tile. The marks live on the RECORD
+   (rec.fav / rec.album / rec.label), not the document, so restoring an old
+   version or pasting a doc never moves a board out of its album; persistCurrent
+   only rewrites name, time and doc, and Back up / Restore carry the records as
+   they are. Albums and label names live in settings.
+   Each tab keeps its own filter (ORG.f[scope]); the selection is shared, so a
+   Shift+click in one place and a Delete in another act on the same set. */
+const ALBUM_COLORS = ['#d9a441', '#7fb3a6', '#e07a6a', '#8fb6d9', '#b48ead', '#7cc08a', '#e9d9b5', '#c48a5a'];
+const LABELS = [['red', '#e07a6a', 'Redo'], ['amber', '#d9a441', 'Review'], ['green', '#7cc08a', 'Approved'], ['teal', '#7fb3a6', 'Hero'], ['blue', '#8fb6d9', 'Idea'], ['purple', '#b48ead', 'Client'], ['grey', '#8c8377', 'Archive']];
+const labelHex = id => (LABELS.find(l => l[0] === id) || [])[1] || '#8c8377';
+const labelName = id => (settings.labelNames || {})[id] || (LABELS.find(l => l[0] === id) || [])[2] || id;
+const ORG = { f: { covers: {}, posts: {}, ads: {} }, sel: new Set(), selectMode: false };
+const albums = () => Array.isArray(settings.albums) ? settings.albums : (settings.albums = []);
+const albumOf = id => albums().find(a => a.id === id) || null;
+const ORG_SCOPE = { covers: r => !isFeed(r.doc), posts: r => isPost(r.doc), ads: r => isAd(r.doc) };
+const orgItems = scope => covers.filter(ORG_SCOPE[scope] || (() => true));
+const orgFilter = scope => ORG.f[scope] || (ORG.f[scope] = {});
+const orgMatch = (r, f) => !(f.fav && !r.fav) && !(f.album && r.album !== f.album) && !(f.label && r.label !== f.label);
+const orgActive = f => !!(f.fav || f.album || f.label);
+const orgNoun = (scope, n) => scope === 'ads' ? (n === 1 ? 'board' : 'boards') : scope === 'posts' ? (n === 1 ? 'slide' : 'slides') : (n === 1 ? 'cover' : 'covers');
+const recOf = id => covers.find(c => c.id === id);
+const orgScopeOf = r => isAd(r.doc) ? 'ads' : isPost(r.doc) ? 'posts' : 'covers';
+function orgSave(recs) { return store.saveCovers(recs).catch(e => console.warn(e)); }
+/* Re-draw whichever lists are showing. The editor rail always is. */
+function orgRerender() {
+  renderCoverList();
+  if ($('#view-posts').classList.contains('active')) renderPosts();
+  if ($('#view-ads').classList.contains('active')) renderAds();
+  if ($('#view-grid').classList.contains('active')) renderGrid();
+  orgPaintSel();   // the body's select state follows the selection, which a delete may just have emptied
+}
+async function setFav(recs, on) { recs.forEach(r => { r.fav = !!on; }); await orgSave(recs); orgRerender(); }
+async function setLabel(recs, id) { recs.forEach(r => { if (id) r.label = id; else delete r.label; }); await orgSave(recs); orgRerender(); }
+async function moveToAlbum(recs, id) {
+  recs.forEach(r => { if (id) r.album = id; else delete r.album; }); await orgSave(recs); orgRerender();
+  const a = albumOf(id); toast(recs.length === 1 ? (a ? `Moved to ${a.name}` : 'Taken out of its album') : (a ? `${recs.length} moved to ${a.name}` : `${recs.length} taken out of their albums`));
+}
+function newAlbum(scope) {
+  const name = (prompt('Name the album') || '').trim(); if (!name) return null;
+  const a = { id: 'al' + uid(), name, color: ALBUM_COLORS[albums().length % ALBUM_COLORS.length], at: Date.now() };
+  albums().push(a); saveSettingsSoon(); if (scope) { orgFilter(scope).album = a.id; } orgRerender(); return a;
+}
+function renameAlbum(a) { const n = (prompt('Rename the album', a.name) || '').trim(); if (!n) return; a.name = n; saveSettingsSoon(); orgRerender(); }
+async function deleteAlbum(a) {
+  const inside = covers.filter(r => r.album === a.id);
+  if (!confirm(`Delete the album “${a.name}”?${inside.length ? ` Its ${inside.length} item${inside.length === 1 ? '' : 's'} stay in the studio, just out of the album.` : ''}`)) return;
+  inside.forEach(r => delete r.album); if (inside.length) await orgSave(inside);
+  settings.albums = albums().filter(x => x.id !== a.id); Object.values(ORG.f).forEach(f => { if (f.album === a.id) delete f.album; });
+  saveSettingsSoon(); orgRerender();
+}
+/* Delete any documents at once. A carousel that loses slides is renumbered; the grid order is
+   pruned; an open document that goes is replaced by the newest cover left. */
+async function deleteRecs(ids, quiet) {
+  ids = [...new Set(ids)].filter(recOf); if (!ids.length) return false;
+  const recs = ids.map(recOf), scopes = new Set(recs.map(orgScopeOf));
+  const what = scopes.size === 1 ? orgNoun([...scopes][0], ids.length) : (ids.length === 1 ? 'item' : 'items');
+  if (!quiet && !confirm(ids.length === 1 ? `Delete “${recs[0].name}”?` : `Delete ${ids.length} ${what}? This cannot be undone.`)) return false;
+  const gone = new Set(ids), cids = new Set(recs.filter(r => isPost(r.doc)).map(r => r.doc.post.cid));
+  for (const id of ids) await store.deleteCover(id).catch(() => {});
+  covers = covers.filter(c => !gone.has(c.id));
+  settings.gridOrder = (settings.gridOrder || []).filter(x => !gone.has(x)); saveSettingsSoon();
+  ids.forEach(id => { ORG.sel.delete(id); picked.delete(id); });
+  for (const cid of cids) { const left = covers.filter(c => c.doc?.post?.cid === cid).sort((a, b) => (a.doc.post.slide || 0) - (b.doc.post.slide || 0)); if (left.length) { renumberSlides(left); await orgSave(left); } }
+  if (doc && gone.has(doc.id)) { const next = [...covers].filter(c => !isFeed(c.doc)).sort((a, b) => b.updatedAt - a.updatedAt)[0] || covers[0]; if (next) loadDoc(next.doc); else newCover(); }
+  orgRerender(); renderPickState();
+  toast(ids.length === 1 ? 'Deleted' : `${ids.length} ${what} deleted`);
+  return true;
+}
+/* A copy of one record, kept in the same family: a board stays in its set with a lettered id, a slide
+   lands after its original and the carousel is renumbered, a cover is a plain copy. */
+async function duplicateRec(r) {
+  const src = r.id === doc?.id ? doc : r.doc, d = JSON.parse(JSON.stringify(src));
+  d.id = uid(); d.createdAt = d.updatedAt = Date.now();
+  if (isAd(d)) {
+    const used = new Set(covers.filter(c => isAd(c.doc)).map(c => c.doc.ad.id));
+    const base = String(d.ad.id).replace(/[a-z]$/, ''); let sfx = 'b'; while (used.has(base + sfx)) sfx = String.fromCharCode(sfx.charCodeAt(0) + 1);
+    d.ad = { ...d.ad, id: base + sfx, key: `${d.ad.setKey}:${base + sfx}:x${uid()}` }; d.name = d.name.replace(/^Static \S+/, `Static ${base + sfx}`);
+    const rec = { ...coverRecord(d), fav: r.fav, label: r.label, album: r.album }; covers.push(rec); await orgSave([rec]);
+  } else if (isPost(d)) {
+    d.post = { ...d.post, key: `${d.post.cid}:x${uid()}` };
+    const rec = { ...coverRecord(d), fav: r.fav, label: r.label, album: r.album };
+    const sib = covers.filter(c => c.doc?.post?.cid === d.post.cid).sort((a, b) => (a.doc.post.slide || 0) - (b.doc.post.slide || 0));
+    const at = sib.findIndex(c => c.id === r.id); sib.splice(at < 0 ? sib.length : at + 1, 0, rec);
+    renumberSlides(sib); covers.push(rec); await orgSave(sib);
+  } else {
+    d.name = r.name + ' copy';
+    const rec = { ...coverRecord(d), fav: r.fav, label: r.label, album: r.album }; covers.push(rec); await orgSave([rec]);
+    const o = settings.gridOrder || [], i = o.indexOf(r.id); if (i >= 0) { o.splice(i + 1, 0, rec.id); saveSettingsSoon(); }
+  }
+  orgRerender(); toast('Duplicated');
+}
+async function exportRecs(recs, label) {
+  if (!recs.length) return;
+  const scale = +$('#exportScale').value || 1;
+  await loadAdFonts(); await awaitSlidePhotos(recs.map(r => r.id === doc?.id ? doc : r.doc));
+  if (recs.length === 1) { const r = recs[0], d = r.id === doc?.id ? doc : r.doc, ds = sizeOf(d); await store.download(`${slug(r.name)}-${ds.w * (scale === 'jpg' ? 1 : scale)}x${ds.h * (scale === 'jpg' ? 1 : scale)}.${scale === 'jpg' ? 'jpg' : 'png'}`, await renderBlob(d, scale === 'jpg' ? 1 : scale, scale === 'jpg' ? 'jpg' : 'png')); return toast('Exported'); }
+  toast(`Rendering ${recs.length}…`); const zip = new JSZip();
+  for (let i = 0; i < recs.length; i++) { const r = recs[i], d = r.id === doc?.id ? doc : r.doc; zip.file(`${String(i + 1).padStart(2, '0')}-${slug(r.name)}.png`, await renderBlob(d, scale === 'jpg' ? 1 : scale)); }
+  await store.download(`${label || 'selection'}-${recs.length}.zip`, await zip.generateAsync({ type: 'blob' })); toast(`${recs.length} exported`);
+}
+/* ---- selection ---- */
+function orgToggleSel(id, on) { if (on === undefined) on = !ORG.sel.has(id); if (on) ORG.sel.add(id); else ORG.sel.delete(id); orgPaintSel(); }
+function orgClearSel() { ORG.sel.clear(); ORG.selectMode = false; orgPaintSel(); }
+function orgPaintSel() {
+  $$('[data-org-id]').forEach(el => el.classList.toggle('selected', ORG.sel.has(el.dataset.orgId)));
+  $$('.orgbar').forEach(bar => { if (bar._sync) bar._sync(); });
+  document.body.classList.toggle('org-select', ORG.selectMode || ORG.sel.size > 0);
+}
+const selRecs = () => [...ORG.sel].map(recOf).filter(Boolean);
+/* ---- popover menu ---- */
+let orgMenuEl = null;
+function orgMenuClose() { if (orgMenuEl) { orgMenuEl.remove(); orgMenuEl = null; } }
+function orgMenu(anchor, items) {
+  orgMenuClose();
+  const m = document.createElement('div'); m.className = 'orgmenu'; m.setAttribute('role', 'menu');
+  items.forEach(it => {
+    if (it === '-') { const hr = document.createElement('hr'); m.appendChild(hr); return; }
+    if (it.head) { const h = document.createElement('div'); h.className = 'orgmenu__head'; h.textContent = it.head; m.appendChild(h); return; }
+    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'menuitem'); b.className = it.danger ? 'danger' : ''; b.disabled = !!it.disabled;
+    b.innerHTML = (it.dot ? `<i class="dot" style="background:${it.dot}"></i>` : it.icon ? `<i class="ic">${it.icon}</i>` : '<i class="ic"></i>') + `<span>${escapeHtml(it.label)}</span>` + (it.on ? '<b>✓</b>' : '');
+    b.onclick = e => { e.stopPropagation(); orgMenuClose(); it.run && it.run(); };
+    m.appendChild(b);
+  });
+  document.body.appendChild(m); orgMenuEl = m;
+  const r = anchor.getBoundingClientRect(), mw = m.offsetWidth, mh = m.offsetHeight;
+  let x = r.right - mw, y = r.bottom + 4; if (x < 8) x = Math.min(r.left, innerWidth - mw - 8); if (y + mh > innerHeight - 8) y = Math.max(8, r.top - mh - 4);
+  m.style.left = x + 'px'; m.style.top = y + 'px';
+  setTimeout(() => { const off = e => { if (!m.contains(e.target)) { orgMenuClose(); window.removeEventListener('pointerdown', off, true); } }; window.addEventListener('pointerdown', off, true); }, 0);
+}
+window.addEventListener('keydown', e => { if (e.key === 'Escape') orgMenuClose(); });
+/* Items of the ⋯ menu for one record, or for the selection it belongs to. */
+function orgMenuItems(recs, opts = {}) {
+  const one = recs.length === 1, r = recs[0], allFav = recs.every(x => x.fav), label = one ? r.label : null, album = one ? r.album : null;
+  const items = [];
+  if (opts.open && one) items.push({ label: 'Open in the editor', icon: '↗', run: () => { loadDoc(r.id === doc?.id ? doc : r.doc); switchView('editor'); } });
+  items.push({ label: allFav ? 'Remove from favourites' : 'Add to favourites', icon: allFav ? '★' : '☆', run: () => setFav(recs, !allFav) });
+  items.push({ head: 'Label' });
+  LABELS.forEach(([id, hex]) => items.push({ label: labelName(id), dot: hex, on: label === id, run: () => setLabel(recs, label === id ? null : id) }));
+  if (label) items.push({ label: 'No label', icon: '○', run: () => setLabel(recs, null) });
+  items.push({ head: 'Album' });
+  albums().forEach(a => items.push({ label: a.name, dot: a.color, on: album === a.id, run: () => moveToAlbum(recs, album === a.id ? null : a.id) }));
+  items.push({ label: '+ New album…', icon: '+', run: () => { const a = newAlbum(); if (a) moveToAlbum(recs, a.id); } });
+  if (album) items.push({ label: 'Take out of its album', icon: '○', run: () => moveToAlbum(recs, null) });
+  items.push('-');
+  if (one) items.push({ label: 'Duplicate', icon: '⧉', run: () => duplicateRec(r) });
+  items.push({ label: one ? 'Export' : `Export ${recs.length}`, icon: '⤓', run: () => exportRecs(recs, one ? slug(r.name) : 'selection') });
+  items.push({ label: one ? 'Delete' : `Delete ${recs.length}`, icon: '✕', danger: true, run: () => deleteRecs(recs.map(x => x.id)) });
+  return items;
+}
+/* The corner controls on a tile or row: a star, the label dot and the ⋯ menu. `el` gets the
+   selection hooks too — Shift+click (or Select mode) toggles it, and dragging it onto an
+   album chip files it. */
+function orgDecor(el, r, scope) {
+  el.dataset.orgId = r.id; el.classList.toggle('selected', ORG.sel.has(r.id));
+  el.classList.toggle('fav', !!r.fav);
+  if (r.label) { el.dataset.label = r.label; el.style.setProperty('--lab', labelHex(r.label)); } else { delete el.dataset.label; el.style.removeProperty('--lab'); }
+  const a = albumOf(r.album); if (a) el.style.setProperty('--alb', a.color); else el.style.removeProperty('--alb');
+  const acts = document.createElement('div'); acts.className = 'orgacts';
+  const star = document.createElement('button'); star.type = 'button'; star.className = 'star'; star.title = r.fav ? 'Remove from favourites' : 'Add to favourites'; star.textContent = r.fav ? '★' : '☆'; star.setAttribute('aria-pressed', !!r.fav);
+  star.onclick = e => { e.stopPropagation(); e.preventDefault(); setFav([r], !r.fav); };
+  const more = document.createElement('button'); more.type = 'button'; more.className = 'more'; more.title = 'Label, album, duplicate, delete'; more.textContent = '⋯';
+  more.onclick = e => { e.stopPropagation(); e.preventDefault(); const recs = ORG.sel.has(r.id) && ORG.sel.size > 1 ? selRecs() : [r]; orgMenu(more, orgMenuItems(recs, { open: true })); };
+  const tick = document.createElement('button'); tick.type = 'button'; tick.className = 'tick'; tick.title = 'Select'; tick.textContent = '✓';
+  tick.onclick = e => { e.stopPropagation(); e.preventDefault(); ORG.selectMode = true; orgToggleSel(r.id); };
+  acts.append(tick, star, more); el.appendChild(acts);
+  if (r.label || a) { const tag = document.createElement('div'); tag.className = 'orgtag'; if (a) { const s = document.createElement('span'); s.className = 'alb'; s.textContent = a.name; s.title = 'Album'; tag.appendChild(s); } if (r.label) { const s = document.createElement('span'); s.className = 'lab'; s.title = 'Label'; s.textContent = labelName(r.label); tag.appendChild(s); } el.appendChild(tag); }
+  el.addEventListener('click', e => { if (e.shiftKey || (ORG.selectMode && !e.target.closest('.orgacts'))) { e.stopImmediatePropagation(); e.preventDefault(); orgToggleSel(r.id); } }, true);
+  el.addEventListener('contextmenu', e => { e.preventDefault(); const recs = ORG.sel.has(r.id) && ORG.sel.size > 1 ? selRecs() : [r]; orgMenu(e.target.closest('[data-org-id]') || el, orgMenuItems(recs, { open: true })); });
+  if (!el.draggable) { el.draggable = true; }
+  el.addEventListener('dragstart', e => { const ids = ORG.sel.has(r.id) ? [...ORG.sel] : [r.id]; e.dataTransfer.setData('text/rcs', JSON.stringify(ids)); e.dataTransfer.effectAllowed = 'move'; el.classList.add('dragging'); document.body.classList.add('org-drag'); });
+  el.addEventListener('dragend', () => { el.classList.remove('dragging'); document.body.classList.remove('org-drag'); });
+}
+const dtHasRcs = e => [...(e.dataTransfer ? e.dataTransfer.types : [])].includes('text/rcs');
+function orgDropTarget(chip, albumId) {
+  chip.addEventListener('dragover', e => { if (!dtHasRcs(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; chip.classList.add('drop'); });
+  chip.addEventListener('dragleave', () => chip.classList.remove('drop'));
+  chip.addEventListener('drop', e => { if (!dtHasRcs(e)) return; e.preventDefault(); chip.classList.remove('drop'); let ids = []; try { ids = JSON.parse(e.dataTransfer.getData('text/rcs')); } catch {} const recs = ids.map(recOf).filter(Boolean); if (recs.length) moveToAlbum(recs, albumId); });
+}
+/* The filter rail for a tab: favourites, the albums (drop targets), the labels, Select, and — while
+   anything is selected — the actions for the lot. `compact` is the editor rail's narrow form. */
+function orgBar(scope, compact) {
+  const f = orgFilter(scope), items = orgItems(scope), bar = document.createElement('div'); bar.className = 'orgbar' + (compact ? ' compact' : ''); bar.dataset.scope = scope;
+  const row = document.createElement('div'); row.className = 'orgrow';
+  const chip = (label, on, n, run, cls) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip ' + (cls || ''); b.setAttribute('aria-pressed', !!on); b.innerHTML = escapeHtml(label) + (n != null ? `<i>${n}</i>` : ''); b.onclick = run; return b; };
+  const nFav = items.filter(r => r.fav).length;
+  row.appendChild(chip('All', !orgActive(f), items.length, () => { ORG.f[scope] = {}; orgRerender(); }));
+  row.appendChild(chip('★ Favourites', f.fav, nFav, () => { f.fav = !f.fav; orgRerender(); }, 'fav'));
+  albums().forEach(a => {
+    const n = items.filter(r => r.album === a.id).length, on = f.album === a.id;
+    const c = chip(a.name, on, n, () => { f.album = on ? null : a.id; if (!f.album) delete f.album; orgRerender(); }, 'alb'); c.style.setProperty('--alb', a.color);
+    c.title = `Album · drop tiles here to file them${on ? ' · right-click to rename or delete' : ''}`;
+    c.oncontextmenu = e => { e.preventDefault(); orgMenu(c, [{ head: a.name }, { label: 'Rename', icon: '✎', run: () => renameAlbum(a) }, { head: 'Colour' }, ...ALBUM_COLORS.map(h => ({ label: h === a.color ? 'This colour' : ' ', dot: h, on: h === a.color, run: () => { a.color = h; saveSettingsSoon(); orgRerender(); } })), '-', { label: 'Delete album', icon: '✕', danger: true, run: () => deleteAlbum(a) }]); };
+    orgDropTarget(c, a.id); row.appendChild(c);
+  });
+  const plus = chip('+ Album', false, null, () => newAlbum(scope), 'ghostchip'); plus.title = 'Make an album, then drag tiles onto it'; row.appendChild(plus);
+  const unfiled = document.createElement('span'); unfiled.className = 'chip drop-out'; unfiled.textContent = 'out of album'; unfiled.title = 'Drop a tile here to take it out of its album'; orgDropTarget(unfiled, null); row.appendChild(unfiled);
+  const labs = document.createElement('span'); labs.className = 'orglabels'; labs.title = 'Labels · click to filter · double-click to rename';
+  LABELS.forEach(([id, hex]) => { const n = items.filter(r => r.label === id).length; const b = document.createElement('button'); b.type = 'button'; b.className = 'labdot'; b.style.setProperty('--lab', hex); b.setAttribute('aria-pressed', f.label === id); b.title = `${labelName(id)}${n ? ` · ${n}` : ''}`; b.innerHTML = n ? `<i>${n}</i>` : ''; b.onclick = () => { f.label = f.label === id ? null : id; if (!f.label) delete f.label; orgRerender(); }; b.ondblclick = e => { e.preventDefault(); const nm = (prompt(`Name for the ${id} label`, labelName(id)) || '').trim(); if (!nm) return; settings.labelNames = { ...(settings.labelNames || {}), [id]: nm }; saveSettingsSoon(); orgRerender(); }; labs.appendChild(b); });
+  row.appendChild(labs);
+  const selBtn = chip('Select', ORG.selectMode, null, () => { ORG.selectMode = !ORG.selectMode; if (!ORG.selectMode) ORG.sel.clear(); orgPaintSel(); }, 'selchip'); selBtn.title = 'Tick tiles to act on several at once (or Shift+click them)'; row.appendChild(selBtn);
+  bar.appendChild(row);
+  const acts = document.createElement('div'); acts.className = 'orgsel'; bar.appendChild(acts);
+  bar._sync = () => {
+    selBtn.setAttribute('aria-pressed', ORG.selectMode || ORG.sel.size > 0);
+    const recs = selRecs(); acts.innerHTML = ''; acts.hidden = !recs.length; if (!recs.length) return;
+    const n = document.createElement('b'); n.textContent = `${recs.length} selected`; acts.appendChild(n);
+    const mk = (label, run, cls) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'small ' + (cls || ''); b.textContent = label; b.onclick = run; acts.appendChild(b); return b; };
+    const allFav = recs.every(r => r.fav); mk(allFav ? '☆ Unfavourite' : '★ Favourite', () => setFav(recs, !allFav));
+    const lb = mk('Label ▾', () => orgMenu(lb, [{ head: 'Label' }, ...LABELS.map(([id, hex]) => ({ label: labelName(id), dot: hex, run: () => setLabel(recs, id) })), { label: 'No label', icon: '○', run: () => setLabel(recs, null) }]));
+    const mv = mk('Move to ▾', () => orgMenu(mv, [{ head: 'Album' }, ...albums().map(a => ({ label: a.name, dot: a.color, run: () => moveToAlbum(recs, a.id) })), { label: '+ New album…', icon: '+', run: () => { const a = newAlbum(); if (a) moveToAlbum(recs, a.id); } }, { label: 'Out of album', icon: '○', run: () => moveToAlbum(recs, null) }]));
+    mk('Export', () => exportRecs(recs, scope));
+    mk('Delete', () => deleteRecs(recs.map(r => r.id)), 'danger');
+    mk('Clear', () => orgClearSel(), 'ghost');
+  };
+  bar._sync();
+  return bar;
+}
+/* Delete or Escape on a selection, from any tab. The editor's own key handling runs only there and only
+   on a layer, so this never fights it. */
+window.addEventListener('keydown', e => {
+  const tag = document.activeElement?.tagName; if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (!ORG.sel.size) return;
+  if (e.key === 'Escape') { orgClearSel(); }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && (!$('#view-editor').classList.contains('active') || !sel)) { e.preventDefault(); deleteRecs([...ORG.sel]); }
+});
+
+/* ---------------- deconstruct: a picture → layers ----------------
+   "Break down a picture": a finished poster, ad or screenshot comes apart into
+   the things the editor already knows — text layers (read off the pixels with
+   Tesseract, on-device once the library has loaded), the subject as a cutout
+   (MediaPipe, the same model the Cutout tab uses), marks and rules sitting on
+   flat ground as logo / rule layers — and what is left, with every element
+   patched out, becomes the background plate. Everything the analysis finds is
+   listed and can be left out before the layers are built; nothing is uploaded.
+   All analysis coordinates are in "source space": the picture as loaded, capped
+   at 2400 px on its long side like every other upload. */
+const TESS_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+const DEC = { img: null, name: '', res: null, target: 'auto', plate: 'keep', busy: false, hover: null, view: null, tess: null };
+const DEC_KIND = { text: { c: '#d9a441', k: 'TEXT' }, subject: { c: '#7fb3a6', k: 'CUT' }, mark: { c: '#e07a6a', k: 'MARK' }, rule: { c: '#8fb6d9', k: 'RULE' } };
+function loadScript(url) { return new Promise((res, rej) => { if ([...document.scripts].some(s => s.src === url)) return res(); const s = document.createElement('script'); s.src = url; s.onload = res; s.onerror = () => rej(new Error('script failed: ' + url)); document.head.appendChild(s); }); }
+async function decTesseract(onProgress) {
+  if (DEC.tess) return DEC.tess;
+  await withTimeout(loadScript(TESS_URL), 20000);
+  if (typeof Tesseract === 'undefined') throw new Error('Tesseract missing');
+  DEC.tess = await withTimeout(Tesseract.createWorker('eng', 1, { logger: m => { if (onProgress && m && typeof m.progress === 'number') onProgress(m); } }), 90000);
+  return DEC.tess;
+}
+const decStatus = (t, cls) => { const el = $('#deconStatus'); if (el) { el.textContent = t; el.className = 'decon__status mono' + (cls ? ' ' + cls : ''); } };
+/* ---- pixel helpers (RGBA Uint8ClampedArray, index by pixel) ---- */
+const px = (d, i) => [d[i * 4], d[i * 4 + 1], d[i * 4 + 2]];
+const cdist = (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]));
+const toHex = c => '#' + c.map(v => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join('');
+function medianColor(list) { if (!list.length) return null; const ch = k => { const a = list.map(c => c[k]).sort((x, y) => x - y); return a[a.length >> 1]; }; return [ch(0), ch(1), ch(2)]; }
+function median(a) { if (!a.length) return 0; a = a.slice().sort((x, y) => x - y); return a[a.length >> 1]; }
+/* Grow a 0/1 mask by r pixels (square). */
+function dilate(m, w, h, r) {
+  if (!r) return m; const t = new Uint8Array(m.length), o = new Uint8Array(m.length);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let v = 0; for (let k = -r; k <= r && !v; k++) { const xx = x + k; if (xx >= 0 && xx < w && m[y * w + xx]) v = 1; } t[y * w + x] = v; }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let v = 0; for (let k = -r; k <= r && !v; k++) { const yy = y + k; if (yy >= 0 && yy < h && t[yy * w + x]) v = 1; } o[y * w + x] = v; }
+  return o;
+}
+/* Fill the pixels marked in `hole` from their known neighbours, working inwards from the edge
+   of each hole (a breadth-first sweep), then soften the fill so no streaks show. Flat ground
+   comes back exactly flat; a photo comes back as a smear, which is what sits behind moved
+   text well enough. */
+function bfsFill(d, w, h, hole) {
+  const n = w * h, st = new Uint8Array(n); for (let i = 0; i < n; i++) st[i] = hole[i] ? 0 : 1;   // 1 known, 0 unknown, 2 queued
+  const q = new Int32Array(n); let qh = 0, qt = 0;
+  const nb4 = [-1, 1, -w, w];
+  for (let i = 0; i < n; i++) if (!st[i]) { const x = i % w; for (const o of nb4) { const j = i + o; if (j < 0 || j >= n || (o === -1 && x === 0) || (o === 1 && x === w - 1)) continue; if (st[j] === 1) { st[i] = 2; q[qt++] = i; break; } } }
+  while (qh < qt) {
+    const i = q[qh++], x = i % w, y = (i / w) | 0; let r = 0, g = 0, b = 0, k = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue; const j = yy * w + xx; if (st[j] === 1) { r += d[j * 4]; g += d[j * 4 + 1]; b += d[j * 4 + 2]; k++; } }
+    if (k) { d[i * 4] = r / k; d[i * 4 + 1] = g / k; d[i * 4 + 2] = b / k; d[i * 4 + 3] = 255; }
+    st[i] = 1;
+    for (const o of nb4) { const j = i + o; if (j < 0 || j >= n || (o === -1 && x === 0) || (o === 1 && x === w - 1)) continue; if (st[j] === 0) { st[j] = 2; q[qt++] = j; } }
+  }
+  // two passes of a 3×3 mean over the filled pixels only
+  const soft = dilate(hole, w, h, 1);
+  for (let pass = 0; pass < 2; pass++) {
+    const c = new Uint8ClampedArray(d);
+    for (let i = 0; i < n; i++) { if (!soft[i]) continue; const x = i % w, y = (i / w) | 0; let r = 0, g = 0, b = 0, k = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue; const j = (yy * w + xx) * 4; r += c[j]; g += c[j + 1]; b += c[j + 2]; k++; } d[i * 4] = r / k; d[i * 4 + 1] = g / k; d[i * 4 + 2] = b / k; }
+  }
+}
+/* A big hole (the subject) gets a defocused fill: filled small, blurred hard, then scaled back up. */
+function blurFill(SRC, hole) {
+  const w = SRC.width, h = SRC.height, k = 4, sw = Math.ceil(w / k), sh = Math.ceil(h / k);
+  const small = new ImageData(sw, sh), sd = small.data, shole = new Uint8Array(sw * sh), d = SRC.data;
+  // any cell touching the hole counts as hole, so the fill always covers it with margin
+  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) { let r = 0, g = 0, b = 0, n = 0, hc = 0; for (let dy = 0; dy < k; dy++) for (let dx = 0; dx < k; dx++) { const xx = x * k + dx, yy = y * k + dy; if (xx >= w || yy >= h) continue; const i = yy * w + xx; if (hole[i]) { hc++; continue; } r += d[i * 4]; g += d[i * 4 + 1]; b += d[i * 4 + 2]; n++; } const j = (y * sw + x) * 4; if (n) { sd[j] = r / n; sd[j + 1] = g / n; sd[j + 2] = b / n; } sd[j + 3] = 255; shole[y * sw + x] = hc > 0 ? 1 : 0; }
+  bfsFill(sd, sw, sh, shole);
+  for (let pass = 0; pass < 3; pass++) { const c = new Uint8ClampedArray(sd); const R = 5; for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) { let r = 0, g = 0, b = 0, n = 0; for (let dy = -R; dy <= R; dy++) { const yy = y + dy; if (yy < 0 || yy >= sh) continue; for (let dx = -R; dx <= R; dx++) { const xx = x + dx; if (xx < 0 || xx >= sw) continue; const j = (yy * sw + xx) * 4; r += c[j]; g += c[j + 1]; b += c[j + 2]; n++; } } const j = (y * sw + x) * 4; sd[j] = r / n; sd[j + 1] = g / n; sd[j + 2] = b / n; } }
+  const sc = document.createElement('canvas'); sc.width = sw; sc.height = sh; sc.getContext('2d').putImageData(small, 0, 0);
+  const bc = document.createElement('canvas'); bc.width = w; bc.height = h; const bx = bc.getContext('2d'); bx.imageSmoothingQuality = 'high'; bx.drawImage(sc, 0, 0, w, h);
+  const bd = bx.getImageData(0, 0, w, h).data;
+  for (let i = 0; i < w * h; i++) { if (!hole[i]) continue; d[i * 4] = bd[i * 4]; d[i * 4 + 1] = bd[i * 4 + 1]; d[i * 4 + 2] = bd[i * 4 + 2]; }
+  // then blur the seam itself, a band either side of the hole's edge, so the sharp picture meets the soft fill gradually
+  const outer = dilate(hole, w, h, 7), innerGap = dilate(hole.map(v => v ? 0 : 1), w, h, 7);   // innerGap = 1 outside or within 7px inside the edge
+  const band = new Uint8Array(w * h); for (let i = 0; i < w * h; i++) band[i] = outer[i] && innerGap[i] ? 1 : 0;
+  for (let pass = 0; pass < 2; pass++) { const c = new Uint8ClampedArray(d); const R = 3; for (let i = 0; i < w * h; i++) { if (!band[i]) continue; const x = i % w, y = (i / w) | 0; let r = 0, g = 0, b = 0, n = 0; for (let dy = -R; dy <= R; dy++) { const yy = y + dy; if (yy < 0 || yy >= h) continue; for (let dx = -R; dx <= R; dx++) { const xx = x + dx; if (xx < 0 || xx >= w) continue; const j = (yy * w + xx) * 4; r += c[j]; g += c[j + 1]; b += c[j + 2]; n++; } } d[i * 4] = r / n; d[i * 4 + 1] = g / n; d[i * 4 + 2] = b / n; } }
+}
+/* ---- open / close ---- */
+const deconEl = $('#decon');
+function decOpen(src, opts = {}) {
+  DEC.target = opts.target || 'auto'; DEC.res = null; DEC.hover = null; DEC.busy = false;
+  if (!deconEl.open) deconEl.showModal();
+  decSyncChips(); decList();
+  if (!src) { DEC.img = null; DEC.name = ''; $('#deconDrop').hidden = false; $('#deconBuild').disabled = true; $('#deconAgain').disabled = true; decStatus('Drop a picture, or choose a file'); decDraw(); return; }
+  decLoad(src, opts.name);
+}
+async function decLoad(src, name) {
+  let im = src;
+  if (src instanceof Blob) { if (!src.type.startsWith('image/')) return toast('That file isn’t an image'); name = name || src.name.replace(/\.[^.]+$/, ''); im = await new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = URL.createObjectURL(src); }); }
+  if (!im || !im.naturalWidth) return toast('Couldn’t read that picture');
+  // source space: the picture as loaded, capped like an upload
+  const k = Math.min(1, 2400 / Math.max(im.naturalWidth, im.naturalHeight)), w = Math.round(im.naturalWidth * k), h = Math.round(im.naturalHeight * k);
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingQuality = 'high'; x.drawImage(im, 0, 0, w, h);
+  let SRC; try { SRC = x.getImageData(0, 0, w, h); } catch (e) { console.warn(e); return toast('That picture can’t be read back — pick the file itself instead'); }
+  DEC.img = c; DEC.src = SRC; DEC.name = (name || 'Picture').slice(0, 40);
+  $('#deconDrop').hidden = true; $('#deconAgain').disabled = false;
+  decDraw(); decAnalyse();
+}
+deconEl.addEventListener('close', () => { DEC.res = null; DEC.img = null; decDraw(); });
+$('#deconCancel').onclick = () => deconEl.close();
+$('#deconPick').onclick = () => pickFile(f => decLoad(f));
+$('#deconAgain').onclick = () => { if (DEC.img && !DEC.busy) decAnalyse(); };
+$('#deconBuild').onclick = () => decBuild();
+['dragenter', 'dragover'].forEach(ev => deconEl.addEventListener(ev, e => { if (!dtHasFiles(e)) return; e.preventDefault(); e.stopPropagation(); deconEl.classList.add('filedrop'); }));
+deconEl.addEventListener('dragleave', () => deconEl.classList.remove('filedrop'));
+deconEl.addEventListener('drop', e => { if (!dtHasFiles(e)) return; e.preventDefault(); e.stopPropagation(); deconEl.classList.remove('filedrop'); const f = [...e.dataTransfer.files].find(x => x.type.startsWith('image/')); if (f) decLoad(f); });
+$('#deconTarget').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; DEC.target = b.dataset.v; decSyncChips(); };
+$('#deconPlate').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; DEC.plate = b.dataset.v; decSyncChips(); };
+/* Which frame the result gets. 'auto' follows the picture's shape: tall → a reel cover, 4:5 or square → a static ad board. */
+function decTarget() {
+  const im = DEC.img, r = im ? im.height / im.width : 16 / 9;
+  const adFrame = r >= 1.55 ? '9x16' : r >= 1.12 ? '4x5' : '1x1';
+  let t = DEC.target;
+  if (t === 'auto') t = r >= 1.55 ? 'cover' : 'ad';
+  if (t === 'apply') return { kind: 'apply', ...sizeOf(doc), label: `the open ${isAd(doc) ? 'board' : isPost(doc) ? 'slide' : 'cover'} (${sizeOf(doc).w} × ${sizeOf(doc).h})` };
+  if (t === 'cover') return { kind: 'cover', w: 1080, h: 1920, label: 'reel cover 1080 × 1920' };
+  if (t === 'slide') return { kind: 'slide', w: 1080, h: 1350, label: 'carousel slide 1080 × 1350' };
+  const f = AD_FRAMES[adFrame]; return { kind: 'ad', w: f.w, h: f.h, frame: adFrame, label: `static ad ${f.label} ${f.w} × ${f.h}` };
+}
+function decSyncChips() {
+  const t = decTarget();
+  $$('#deconTarget .chip').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === DEC.target));
+  $('#deconTarget [data-v=auto]').textContent = `Auto · ${t.kind === 'cover' ? 'cover' : t.kind === 'ad' ? 'static ad' : t.kind}`;
+  $('#deconTarget [data-v=apply]').hidden = !doc;
+  $$('#deconPlate .chip').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === DEC.plate));
+  $('#deconTargetNote').textContent = DEC.img ? `Becomes a ${t.label}.` : '';
+}
+/* ---- the preview: the picture with every found element boxed, click to keep or drop it ---- */
+const deconCanvas = $('#deconCanvas');
+function decDraw() {
+  const c = deconCanvas, im = DEC.img;
+  if (!im) { c.width = 540; c.height = 720; c.getContext('2d').clearRect(0, 0, c.width, c.height); c.style.width = ''; return; }
+  const st = $('#deconStage'), maxW = Math.max(200, st.clientWidth - 24), maxH = Math.max(200, st.clientHeight - 24);
+  const s = Math.min(maxW / im.width, maxH / im.height, 1), dpr = Math.min(devicePixelRatio || 1, 2);
+  c.style.width = Math.round(im.width * s) + 'px'; c.style.height = Math.round(im.height * s) + 'px';
+  c.width = Math.round(im.width * s * dpr); c.height = Math.round(im.height * s * dpr);
+  const x = c.getContext('2d'); x.setTransform(s * dpr, 0, 0, s * dpr, 0, 0); x.drawImage(im, 0, 0);
+  DEC.view = { s };
+  const R = DEC.res; if (!R) return;
+  x.lineWidth = 2 / s;
+  for (const e of R.elems) {
+    const b = e.bbox, col = DEC_KIND[e.kind].c, hot = DEC.hover === e.id;
+    x.save(); x.strokeStyle = col; x.globalAlpha = e.on ? 1 : .45; x.setLineDash(e.on ? [] : [8 / s, 6 / s]); x.lineWidth = (hot ? 3.5 : 2) / s;
+    x.strokeRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
+    if (e.on) { x.fillStyle = col; x.globalAlpha = hot ? .2 : .1; x.fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); }
+    x.globalAlpha = 1; x.fillStyle = col; const fs = 13 / s; x.font = `600 ${fs}px "JetBrains Mono"`; const lab = `${e.n}`, tw = x.measureText(lab).width + 8 / s;
+    x.fillRect(b.x0, Math.max(0, b.y0 - fs * 1.35), tw, fs * 1.35); x.fillStyle = '#16150f'; x.textBaseline = 'middle'; x.fillText(lab, b.x0 + 4 / s, Math.max(0, b.y0 - fs * 1.35) + fs * .68);
+    x.restore();
+  }
+}
+function decHit(ev) {
+  const R = DEC.res, v = DEC.view; if (!R || !v) return null;
+  const r = deconCanvas.getBoundingClientRect(), X = (ev.clientX - r.left) / v.s, Y = (ev.clientY - r.top) / v.s;
+  const hits = R.elems.filter(e => X >= e.bbox.x0 && X <= e.bbox.x1 && Y >= e.bbox.y0 && Y <= e.bbox.y1);
+  return hits.sort((a, b) => ((a.bbox.x1 - a.bbox.x0) * (a.bbox.y1 - a.bbox.y0)) - ((b.bbox.x1 - b.bbox.x0) * (b.bbox.y1 - b.bbox.y0)))[0] || null;   // the smallest box under the pointer
+}
+deconCanvas.addEventListener('pointermove', e => { const h = decHit(e); const id = h ? h.id : null; if (id !== DEC.hover) { DEC.hover = id; decDraw(); decList(); } deconCanvas.style.cursor = h ? 'pointer' : ''; });
+deconCanvas.addEventListener('pointerleave', () => { if (DEC.hover) { DEC.hover = null; decDraw(); decList(); } });
+deconCanvas.addEventListener('click', e => { const h = decHit(e); if (h) { h.on = !h.on; decDraw(); decList(); } });
+window.addEventListener('resize', () => { if (deconEl.open) decDraw(); });
+function decList() {
+  const c = $('#deconList'); c.innerHTML = ''; const R = DEC.res;
+  if (!R) { c.innerHTML = `<div class="empty">${DEC.busy ? 'Looking…' : DEC.img ? '' : 'Nothing analysed yet.'}</div>`; return; }
+  if (!R.elems.length) { c.innerHTML = '<div class="empty">No words, subject or marks found — the picture would just be a background plate.</div>'; }
+  R.elems.forEach(e => {
+    const row = document.createElement('label'); row.className = 'decel'; row.dataset.kind = e.kind; row.classList.toggle('off', !e.on); row.classList.toggle('hot', DEC.hover === e.id);
+    row.style.setProperty('--k', DEC_KIND[e.kind].c);
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = e.on; cb.onchange = () => { e.on = cb.checked; decDraw(); row.classList.toggle('off', !e.on); decBuildLabel(); };
+    const k = document.createElement('span'); k.className = 'k'; k.textContent = `${e.n} ${DEC_KIND[e.kind].k}`;
+    const body = document.createElement('span'); body.className = 'body';
+    body.innerHTML = `<b>${escapeHtml(e.title)}</b><small>${escapeHtml(e.meta)}</small>`;
+    row.append(cb, k, body);
+    if (e.color) { const sw = document.createElement('i'); sw.className = 'sw'; sw.style.background = e.color; sw.title = e.color; row.appendChild(sw); }
+    row.onpointerenter = () => { DEC.hover = e.id; decDraw(); $$('.decel', c).forEach(r => r.classList.toggle('hot', r === row)); };
+    row.onpointerleave = () => { DEC.hover = null; decDraw(); row.classList.remove('hot'); };
+    c.appendChild(row);
+  });
+  decBuildLabel();
+}
+function decBuildLabel() { const R = DEC.res, b = $('#deconBuild'); if (!R) { b.disabled = true; b.textContent = 'Build layers'; return; } const n = R.elems.filter(e => e.on).length; b.disabled = DEC.busy; b.textContent = n ? `Build ${n} layer${n === 1 ? '' : 's'} + plate` : 'Build the plate only'; }
+/* ---- analysis ---- */
+async function decAnalyse() {
+  if (DEC.busy || !DEC.img) return; DEC.busy = true; DEC.res = null; decList(); $('#deconBuild').disabled = true;
+  const SRC = DEC.src, w = SRC.width, h = SRC.height;
+  const R = { w, h, elems: [], textMask: new Uint8Array(w * h), subj: null, ocr: 'none' };
+  let n = 0;
+  try {
+    decStatus('Loading the text reader…');
+    let lines = [];
+    try { lines = await decOcr(SRC, m => { if (m.status === 'recognizing text') decStatus(`Reading the words… ${Math.round(m.progress * 100)}%`); else if (/loading|initializ/i.test(m.status || '')) decStatus(`Loading the text reader… ${m.status}`); }); R.ocr = 'ok'; }
+    catch (e) { console.warn('ocr', e); R.ocr = 'off'; decStatus('Text reading is offline here — looking for the subject and marks only', 'warn'); }
+    for (const B of groupBlocks(lines, w, h)) { const t = decTextElem(B, SRC, R.textMask); if (t) { t.id = 't' + (++n); t.n = n; R.elems.push(t); } }
+    decStatus('Finding the subject…');
+    try { const s = await decSubject(DEC.img, SRC); if (s) { s.id = 's' + (++n); s.n = n; R.subj = s; R.elems.push(s); } } catch (e) { console.warn('subject', e); }
+    decStatus('Looking for marks and rules…');
+    await new Promise(r => setTimeout(r, 10));
+    const boxes = R.elems.filter(e => e.kind === 'text' && e.box).map(e => e.box);
+    for (const m of decMarks(SRC, R.textMask, R.subj, boxes)) { m.id = 'm' + (++n); m.n = n; R.elems.push(m); }
+    R.elems.sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0); R.elems.forEach((e, i) => { e.n = i + 1; });
+    DEC.res = R;
+    const nt = R.elems.filter(e => e.kind === 'text').length, nm = R.elems.filter(e => e.kind === 'mark' || e.kind === 'rule').length;
+    decStatus(`Found ${nt} text block${nt === 1 ? '' : 's'}${R.subj ? ', a subject' : ''}${nm ? `, ${nm} mark${nm === 1 ? '' : 's'}` : ''}${R.ocr === 'off' ? ' · text reading was offline' : ''}. Untick anything to leave it in the plate.`, 'ok');
+  } catch (e) { console.warn(e); decStatus('The analysis failed: ' + (e.message || e), 'warn'); DEC.res = R; }
+  DEC.busy = false; decDraw(); decList();
+}
+/* OCR on a contrast-stretched grey copy (inverted when the picture is dark, since light-on-dark
+   type reads far worse), at ~1800 px. A second pass in sparse mode, then the other polarity, only when
+   the first finds almost nothing. Boxes come back in source space. */
+async function decOcr(SRC, onProgress) {
+  const worker = await decTesseract(onProgress);
+  const w = SRC.width, h = SRC.height, k = clamp(1800 / Math.max(w, h), 0.5, 2.5);
+  const c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+  const x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingQuality = 'high'; x.drawImage(DEC.img, 0, 0, c.width, c.height);
+  const id = x.getImageData(0, 0, c.width, c.height), d = id.data, n = c.width * c.height, g = new Float32Array(n), hist = new Uint32Array(256);
+  let sum = 0; for (let i = 0; i < n; i++) { const v = d[i * 4] * .299 + d[i * 4 + 1] * .587 + d[i * 4 + 2] * .114; g[i] = v; sum += v; hist[v | 0]++; }
+  let lo = 0, hi = 255, acc = 0; for (let i = 0; i < 256; i++) { acc += hist[i]; if (acc >= n * .02) { lo = i; break; } } acc = 0; for (let i = 255; i >= 0; i--) { acc += hist[i]; if (acc >= n * .02) { hi = i; break; } }
+  const dark = sum / n < 118, span = Math.max(30, hi - lo);
+  const paint = inv => { for (let i = 0; i < n; i++) { let v = clamp((g[i] - lo) / span * 255, 0, 255); if (inv) v = 255 - v; d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255; } x.putImageData(id, 0, 0); };
+  const run = async psm => { await worker.setParameters({ tessedit_pageseg_mode: String(psm), preserve_interword_spaces: '1' }); const { data } = await worker.recognize(c, {}, { blocks: true, text: true, hocr: false, tsv: false }); return linesOf(data); };
+  const good = ls => ls.reduce((s, l) => s + l.words.length, 0);
+  paint(dark);
+  let ls = await run(3);
+  ls = mergeLines(ls, await run(11));   // sparse mode picks up the lines auto layout skips: a button, a small footer
+  if (good(ls) < 3) { paint(!dark); ls = mergeLines(ls, await run(3)); }
+  ls.forEach(l => { const sc = b => ({ x0: b.x0 / k, y0: b.y0 / k, x1: b.x1 / k, y1: b.y1 / k }); l.bbox = sc(l.bbox); l.words.forEach(wd => { wd.bbox = sc(wd.bbox); }); });
+  ls = ls.filter(l => l.bbox.y1 - l.bbox.y0 >= 7 && l.bbox.y1 - l.bbox.y0 < h * .5 && l.bbox.x1 - l.bbox.x0 >= 4);
+  // a lone glyph taller than every real line of type is a mark the reader took for a letter (a ring for a C);
+  // left out of the text it is picked up by the mark pass instead, so it still becomes a movable layer
+  const tallest = Math.max(0, ...ls.filter(l => l.text.replace(/\s/g, '').length >= 3).map(l => l.bbox.y1 - l.bbox.y0));
+  return ls.filter(l => { const short = l.text.replace(/\s/g, '').length <= 2; if (!short) return true; if (l.conf < 80) return false; return !(tallest && l.bbox.y1 - l.bbox.y0 > tallest * 1.3); });
+}
+function linesOf(data) {
+  const raw = data.blocks ? data.blocks.flatMap(b => (b.paragraphs || []).flatMap(p => p.lines || [])) : (data.lines || []);
+  const out = [];
+  for (const ln of raw) {
+    const words = (ln.words || []).filter(wd => wd.confidence >= 52 && /[A-Za-z0-9]/.test(wd.text) && wd.bbox && wd.bbox.x1 > wd.bbox.x0);
+    if (!words.length) continue;
+    const text = words.map(wd => wd.text).join(' ').trim(); if (!text || (text.length <= 2 && words[0].confidence < 75)) continue;
+    const bb = { x0: Math.min(...words.map(wd => wd.bbox.x0)), y0: Math.min(...words.map(wd => wd.bbox.y0)), x1: Math.max(...words.map(wd => wd.bbox.x1)), y1: Math.max(...words.map(wd => wd.bbox.y1)) };
+    out.push({ text, conf: words.reduce((s, wd) => s + wd.confidence, 0) / words.length, bbox: bb, words: words.map(wd => ({ text: wd.text, conf: wd.confidence, bbox: { ...wd.bbox } })) });
+  }
+  return out;
+}
+const bbOverlap = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
+function mergeLines(a, b) { const out = a.slice(); for (const l of b) { const area = (l.bbox.x1 - l.bbox.x0) * (l.bbox.y1 - l.bbox.y0); if (!out.some(o => bbOverlap(o.bbox, l.bbox) > area * .4)) out.push(l); } return out; }
+/* Lines → blocks: consecutive lines of about the same height, close together and sharing an edge or a
+   centre. A headline and its sub-line differ in height, so they come out as separate layers, which is
+   how the editor wants them. */
+function groupBlocks(lines, w, h) {
+  const ls = lines.slice().sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0), blocks = [];
+  for (const L of ls) {
+    const lh = L.bbox.y1 - L.bbox.y0, cx = (L.bbox.x0 + L.bbox.x1) / 2;
+    let best = null;
+    for (const B of blocks) {
+      const last = B.lines[B.lines.length - 1], bh = B.lh;
+      const gap = L.bbox.y0 - last.bbox.y1, ratio = lh / bh;
+      if (gap < -lh * .5 || gap > Math.max(lh, bh) * 0.95) continue;
+      if (ratio < 0.68 || ratio > 1.45) continue;
+      const bw = Math.max(B.bbox.x1 - B.bbox.x0, L.bbox.x1 - L.bbox.x0), bcx = (B.bbox.x0 + B.bbox.x1) / 2;
+      const xo = Math.min(B.bbox.x1, L.bbox.x1) - Math.max(B.bbox.x0, L.bbox.x0);
+      const aligned = Math.abs(L.bbox.x0 - B.bbox.x0) < bw * .12 || Math.abs(L.bbox.x1 - B.bbox.x1) < bw * .12 || Math.abs(cx - bcx) < bw * .12;
+      if (xo <= 0 && !aligned) continue;
+      if (!best || gap < best.gap) best = { B, gap };
+    }
+    if (best) { const B = best.B; B.lines.push(L); B.lh = (B.lh * (B.lines.length - 1) + lh) / B.lines.length; B.bbox = { x0: Math.min(B.bbox.x0, L.bbox.x0), y0: Math.min(B.bbox.y0, L.bbox.y0), x1: Math.max(B.bbox.x1, L.bbox.x1), y1: Math.max(B.bbox.y1, L.bbox.y1) }; }
+    else blocks.push({ lines: [L], lh, bbox: { ...L.bbox } });
+  }
+  return blocks;
+}
+/* One text block → the description of a text layer, in source space. Colour is read from the pixels,
+   size from the line height and the letters present, alignment from the line edges, weight from the
+   stem width, the face from the stroke contrast. It also paints the block's glyphs into `textMask`. */
+function decTextElem(B, SRC, textMask) {
+  const w = SRC.width, h = SRC.height, d = SRC.data;
+  const text = B.lines.map(l => l.text).join('\n');
+  const ring = [], inner = [];
+  const sample = (x0, y0, x1, y1, into, step) => { for (let y = Math.max(0, y0 | 0); y < Math.min(h, y1); y += step) for (let x = Math.max(0, x0 | 0); x < Math.min(w, x1); x += step) into.push(px(d, y * w + x)); };
+  for (const L of B.lines) { const b = L.bbox; sample(b.x0 - 5, b.y0 - 5, b.x1 + 5, b.y0 - 2, ring, 2); sample(b.x0 - 5, b.y1 + 2, b.x1 + 5, b.y1 + 5, ring, 2); sample(b.x0 - 5, b.y0, b.x0 - 2, b.y1, ring, 2); sample(b.x1 + 2, b.y0, b.x1 + 5, b.y1, ring, 2); for (const wd of L.words) sample(wd.bbox.x0 + 1, wd.bbox.y0 + 1, wd.bbox.x1 - 1, wd.bbox.y1 - 1, inner, 1); }
+  const bgc = medianColor(ring) || [0, 0, 0];
+  const far = inner.filter(c => cdist(c, bgc) > 55);
+  if (far.length < Math.max(12, inner.length * .03)) return null;   // nothing that reads as ink here: an OCR ghost
+  const textc = medianColor(far);
+  // glyph mask, per line, and stroke statistics
+  const runsH = [], runsV = []; let inkArea = 0;
+  for (const L of B.lines) {
+    const b = L.bbox, x0 = Math.max(0, (b.x0 - 3) | 0), y0 = Math.max(0, (b.y0 - 3) | 0), x1 = Math.min(w, (b.x1 + 3) | 0), y1 = Math.min(h, (b.y1 + 3) | 0);
+    for (let y = y0; y < y1; y++) { let run = 0; for (let x = x0; x < x1; x++) { const c = px(d, y * w + x), ink = cdist(c, bgc) > 30 && cdist(c, textc) < cdist(c, bgc); if (ink) { textMask[y * w + x] = 1; inkArea++; run++; } else if (run) { runsH.push(run); run = 0; } } if (run) runsH.push(run); }
+    for (let x = x0; x < x1; x++) { let run = 0; for (let y = y0; y < y1; y++) { if (textMask[y * w + x]) run++; else if (run) { runsV.push(run); run = 0; } } if (run) runsV.push(run); }
+  }
+  const hRun = median(runsH.filter(r => r > 1)) || 2, vRun = median(runsV.filter(r => r > 1)) || 2;
+  // font size from the line height and what the letters contain
+  const letters = text.replace(/[^A-Za-z]/g, ''), caps = letters.length > 0 && letters === letters.toUpperCase();
+  const hasDesc = /[gjpqyQ,;()]/.test(text), hasAsc = /[A-Zbdfhklt0-9]/.test(text);
+  const lh = median(B.lines.map(l => l.bbox.y1 - l.bbox.y0));
+  let size = caps ? lh / 0.70 : hasAsc && hasDesc ? lh / 0.93 : hasAsc || hasDesc ? lh / 0.72 : lh / 0.50;
+  const contrast = Math.max(hRun, vRun) / Math.max(1, Math.min(hRun, vRun)), stem = Math.min(hRun, vRun) / size;
+  const adv = B.lines.reduce((s, l) => s + (l.bbox.x1 - l.bbox.x0) / Math.max(1, l.text.length), 0) / B.lines.length / size;
+  const font = contrast >= 1.35 ? 'Fraunces' : caps && adv < 0.44 ? 'Bebas Neue' : 'Manrope';
+  const fdef = FONTS.find(f => f.n === font), want = stem >= 0.19 ? 900 : stem >= 0.14 ? 700 : stem >= 0.105 ? 600 : stem >= 0.08 ? 500 : 400;
+  const weight = fdef.w.reduce((a, b) => Math.abs(b - want) < Math.abs(a - want) ? b : a, fdef.w[0]);
+  // alignment from the line edges
+  const bw = B.bbox.x1 - B.bbox.x0, cx = (B.bbox.x0 + B.bbox.x1) / 2;
+  let align = 'left';
+  if (B.lines.length > 1) {
+    const dev = f => B.lines.reduce((s, l) => s + Math.abs(f(l.bbox)), 0) / B.lines.length;
+    const dl = dev(b => b.x0 - B.bbox.x0), dr = dev(b => b.x1 - B.bbox.x1), dc = dev(b => (b.x0 + b.x1) / 2 - cx);
+    align = dc <= dl && dc <= dr ? 'center' : dr < dl ? 'right' : 'left';
+  } else if (Math.abs(cx - w / 2) < w * .035) align = 'center';
+  // width calibration against the editor's own face
+  const probe = newText({ text, font, weight, size: Math.round(size), track: 0, upper: false, line: 1.1, width: 1 });
+  const mx = measureCtx(); mx.font = fontString(probe); mx.letterSpacing = '0px';
+  let measured = 0, chars = 0; B.lines.forEach(l => { measured = Math.max(measured, mx.measureText(l.text).width); chars = Math.max(chars, l.text.length); });
+  const widest = Math.max(...B.lines.map(l => l.bbox.x1 - l.bbox.x0));
+  let ratio = measured > 0 ? widest / measured : 1;
+  if (ratio < 0.85 || ratio > 1.15) { size *= clamp(ratio, 0.72, 1.35); mx.font = fontString({ ...probe, size: Math.round(size) }); measured = Math.max(...B.lines.map(l => mx.measureText(l.text).width)); ratio = measured > 0 ? widest / measured : 1; }
+  const track = clamp((widest - measured) / Math.max(1, chars - 1) / size, -0.08, 0.3);
+  // leading from the baseline pitch; baseline of a line sits at its ink foot, less the descender if it has one
+  const base = l => l.bbox.y1 - (/[gjpqyQ,;()]/.test(l.text) ? 0.22 * size : 0.03 * size);
+  const first = base(B.lines[0]), last = base(B.lines[B.lines.length - 1]);
+  const line = B.lines.length > 1 ? clamp((last - first) / (B.lines.length - 1) / size, 0.85, 1.9) : 1.05;
+  const top = first - (size * line / 2 + 0.34 * size);
+  // a block sitting on its own box (a button, a pill)
+  let box = null;
+  const outer = []; const pad = lh * 1.3;
+  sample(B.bbox.x0 - pad - 4, B.bbox.y0 - pad - 4, B.bbox.x1 + pad + 4, B.bbox.y0 - pad, outer, 3); sample(B.bbox.x0 - pad - 4, B.bbox.y1 + pad, B.bbox.x1 + pad + 4, B.bbox.y1 + pad + 4, outer, 3);
+  const outc = medianColor(outer);
+  const ringSpread = ring.length ? ring.reduce((s, c) => s + cdist(c, bgc), 0) / ring.length : 99;
+  if (outc && cdist(outc, bgc) > 45 && ringSpread < 16) {
+    // grow from the words until the colour changes, to find the box's edges
+    const near = (x, y) => { x = clamp(x | 0, 0, w - 1); y = clamp(y | 0, 0, h - 1); return cdist(px(d, y * w + x), bgc) < 28; };
+    const lim = lh * 3; let x0 = B.bbox.x0, x1 = B.bbox.x1, y0 = B.bbox.y0, y1 = B.bbox.y1; const ym = (y0 + y1) / 2, xm = (x0 + x1) / 2;
+    while (x0 > B.bbox.x0 - lim && x0 > 0 && near(x0 - 2, ym) && near(x0 - 2, ym - lh * .3) && near(x0 - 2, ym + lh * .3)) x0 -= 2;
+    while (x1 < B.bbox.x1 + lim && x1 < w - 1 && near(x1 + 2, ym) && near(x1 + 2, ym - lh * .3) && near(x1 + 2, ym + lh * .3)) x1 += 2;
+    while (y0 > B.bbox.y0 - lim && y0 > 0 && near(xm, y0 - 2) && near(x0 + 4, y0 - 2) && near(x1 - 4, y0 - 2)) y0 -= 2;
+    while (y1 < B.bbox.y1 + lim && y1 < h - 1 && near(xm, y1 + 2) && near(x0 + 4, y1 + 2) && near(x1 - 4, y1 + 2)) y1 += 2;
+    if (x0 < B.bbox.x0 - 3 && x1 > B.bbox.x1 + 3 && y0 < B.bbox.y0 - 1 && y1 > B.bbox.y1 + 1) box = { x0, y0, x1, y1, color: toHex(bgc) };
+  }
+  const anchorX = align === 'left' ? B.bbox.x0 : align === 'right' ? B.bbox.x1 : cx;
+  const first1 = text.split('\n')[0];
+  return {
+    kind: 'text', on: true, bbox: box ? { x0: box.x0, y0: box.y0, x1: box.x1, y1: box.y1 } : { ...B.bbox }, textBox: { ...B.bbox }, lines: B.lines, box,
+    title: first1.length > 44 ? first1.slice(0, 42) + '…' : first1, meta: `${font} ${weight}${caps ? ' · caps' : ''} · ${Math.round(size)} px · ${align}${B.lines.length > 1 ? ` · ${B.lines.length} lines` : ''}${box ? ' · on a box' : ''}`,
+    color: toHex(textc), text, font, weight, size, track: +track.toFixed(3), line: +line.toFixed(2), align, anchorX, top, caps, widthPx: Math.max(widest, measured) * 1.04 + size * .1,
+  };
+}
+/* The subject, through the same on-device model as the Cutout tab. Skipped when it covers almost none or
+   nearly all of the picture (a poster with no one in it, or a portrait that is all face). */
+async function decSubject(c, SRC) {
+  const w = SRC.width, h = SRC.height;
+  if (!cut.seg) { if (typeof SelfieSegmentation === 'undefined') return null; cut.seg = new SelfieSegmentation({ locateFile: f => 'mp/' + f }); cut.seg.setOptions({ modelSelection: 1, selfieMode: false }); await withTimeout(cut.seg.initialize(), 25000); }
+  const mw = 1024, sc = Math.min(1, mw / Math.max(w, h)); const inC = document.createElement('canvas'); inC.width = Math.round(w * sc); inC.height = Math.round(h * sc); inC.getContext('2d').drawImage(c, 0, 0, inC.width, inC.height);
+  const res = await withTimeout(new Promise(r => { cut.seg.onResults(r); cut.seg.send({ image: inC }); }), 30000);
+  // the model's mask is coarse (256 px across) — soften it as it is scaled up, or the cutout's edge comes out in steps
+  const mc = document.createElement('canvas'); mc.width = w; mc.height = h; const mcx = mc.getContext('2d'); mcx.filter = `blur(${Math.max(2, Math.round(Math.max(w, h) / 400))}px)`; mcx.drawImage(res.segmentationMask, 0, 0, w, h); mcx.filter = 'none';
+  const md = mcx.getImageData(0, 0, w, h).data, mask = new Uint8Array(w * h);
+  let n = 0, x0 = w, y0 = h, x1 = 0, y1 = 0;
+  for (let i = 0; i < w * h; i++) { const v = md[i * 4]; mask[i] = v; if (v > 128) { n++; const x = i % w, y = (i / w) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
+  const cov = n / (w * h); if (cov < 0.02 || cov > 0.9) return null;
+  // a person fills their own box; a stray low-confidence smear over a poster does not
+  const fill = n / Math.max(1, (x1 - x0 + 1) * (y1 - y0 + 1));
+  let conf = 0; for (let i = 0; i < w * h; i++) if (mask[i] > 128) conf += mask[i]; conf /= Math.max(1, n);
+  if (fill < 0.28 || conf < 185) return null;
+  return { kind: 'subject', on: true, mask, bbox: { x0, y0, x1: x1 + 1, y1: y1 + 1 }, cov, title: 'Subject cutout', meta: `${Math.round(cov * 100)}% of the picture · becomes the movable cutout`, color: null };
+}
+/* Marks and rules: things that differ from the ground around them, sit on flat colour, and are not
+   words or the subject. Worked out on a small copy, extracted from the full picture. */
+function decMarks(SRC, textMask, subj, boxes = []) {
+  const w = SRC.width, h = SRC.height, ws = Math.min(1, 640 / Math.max(w, h)), ww = Math.max(1, Math.round(w * ws)), wh = Math.max(1, Math.round(h * ws));
+  const sc = document.createElement('canvas'); sc.width = ww; sc.height = wh; const sx = sc.getContext('2d'); sx.imageSmoothingQuality = 'high'; sx.drawImage(DEC.img, 0, 0, ww, wh);
+  const D = sx.getImageData(0, 0, ww, wh).data, N = ww * wh;
+  const K = new Uint8Array(N); const inv = 1 / ws;
+  const inBox = (X, Y) => boxes.some(b => X >= b.x0 - 2 && X <= b.x1 + 2 && Y >= b.y0 - 2 && Y <= b.y1 + 2);
+  for (let y = 0; y < wh; y++) for (let x = 0; x < ww; x++) { const X = Math.min(w - 1, Math.round((x + .5) * inv)), Y = Math.min(h - 1, Math.round((y + .5) * inv)); const i = Y * w + X; K[y * ww + x] = textMask[i] || (subj && subj.mask[i] > 100) || (boxes.length && inBox(X, Y)) ? 1 : 0; }
+  const blocked = dilate(K, ww, wh, 3); for (let i = 0; i < N; i++) K[i] = blocked[i] ? 0 : 1;
+  // the subject's box, a little wider: bits of a person the model missed are not marks
+  const sb = subj ? { x0: (subj.bbox.x0 - w * .04) * ws, y0: (subj.bbox.y0 - h * .04) * ws, x1: (subj.bbox.x1 + w * .04) * ws, y1: (subj.bbox.y1 + h * .04) * ws } : null;
+  // mask-aware box blur of the picture = the ground it sits on
+  const R = Math.max(6, Math.round(0.09 * Math.max(ww, wh))), sat = ch => { const t = new Float64Array((ww + 1) * (wh + 1)); for (let y = 1; y <= wh; y++) { let row = 0; for (let x = 1; x <= ww; x++) { const i = (y - 1) * ww + (x - 1); row += K[i] ? (ch < 0 ? 1 : D[i * 4 + ch]) : 0; t[y * (ww + 1) + x] = t[(y - 1) * (ww + 1) + x] + row; } } return t; };
+  const S = [sat(0), sat(1), sat(2)], SK = sat(-1);
+  const area = (t, x0, y0, x1, y1) => t[y1 * (ww + 1) + x1] - t[y0 * (ww + 1) + x1] - t[y1 * (ww + 1) + x0] + t[y0 * (ww + 1) + x0];
+  const diff = new Uint8Array(N), flat = new Uint8Array(N), grey = i => D[i * 4] * .299 + D[i * 4 + 1] * .587 + D[i * 4 + 2] * .114;
+  for (let y = 0; y < wh; y++) for (let x = 0; x < ww; x++) {
+    const i = y * ww + x, x0 = Math.max(0, x - R), y0 = Math.max(0, y - R), x1 = Math.min(ww, x + R + 1), y1 = Math.min(wh, y + R + 1), k = area(SK, x0, y0, x1, y1);
+    if (K[i] && k > 0) { const b = [area(S[0], x0, y0, x1, y1) / k, area(S[1], x0, y0, x1, y1) / k, area(S[2], x0, y0, x1, y1) / k]; diff[i] = Math.min(255, cdist(px(D, i), b)); }
+    const gx = x > 0 && x < ww - 1 ? Math.abs(grey(i + 1) - grey(i - 1)) : 0, gy = y > 0 && y < wh - 1 ? Math.abs(grey(i + ww) - grey(i - ww)) : 0;
+    flat[i] = gx + gy < 10 ? 1 : 0;
+  }
+  // connected components of "differs from the ground"
+  const lab = new Int32Array(N).fill(-1), comps = []; const stack = [];
+  for (let s = 0; s < N; s++) {
+    if (lab[s] >= 0 || !K[s] || diff[s] <= 40) continue;
+    const id = comps.length, c = { id, n: 0, x0: ww, y0: wh, x1: 0, y1: 0, pix: [] }; comps.push(c); stack.push(s); lab[s] = id;
+    while (stack.length) { const i = stack.pop(); const x = i % ww, y = (i / ww) | 0; c.n++; c.pix.push(i); if (x < c.x0) c.x0 = x; if (x > c.x1) c.x1 = x; if (y < c.y0) c.y0 = y; if (y > c.y1) c.y1 = y;
+      for (const o of [-1, 1, -ww, ww]) { const j = i + o; if (j < 0 || j >= N || (o === -1 && x === 0) || (o === 1 && x === ww - 1)) continue; if (lab[j] < 0 && K[j] && diff[j] > 40) { lab[j] = id; stack.push(j); } } }
+  }
+  // a poster is mostly flat ground; a photograph is not, and a "mark" on one is nearly always picture detail
+  let flatK = 0, allK = 0; for (let i = 0; i < N; i++) if (K[i]) { allK++; if (flat[i]) flatK++; }
+  const photo = allK ? flatK / allK < 0.75 : true;
+  const lim = photo ? { flat: 0.85, ring: 8, pal: 16 } : { flat: 0.62, ring: 18, pal: 48 };
+  const ringOf = (x0, y0, x1, y1) => { const ringPx = []; let flatN = 0, ringN = 0;
+    for (let y = y0 - 6; y <= y1 + 6; y++) for (let x = x0 - 6; x <= x1 + 6; x++) { if (x < 0 || y < 0 || x >= ww || y >= wh) continue; if (x >= x0 - 1 && x <= x1 + 1 && y >= y0 - 1 && y <= y1 + 1) continue; const i = y * ww + x; if (!K[i]) continue; ringN++; if (flat[i]) flatN++; ringPx.push(px(D, i)); }
+    const rc = medianColor(ringPx); return { rc, n: ringN, flat: ringN ? flatN / ringN : 0, spread: rc ? ringPx.reduce((s, p) => s + cdist(p, rc), 0) / ringPx.length : 99 }; };
+  const keep = [];
+  for (const c of comps) {
+    let bw = c.x1 - c.x0 + 1, bh = c.y1 - c.y0 + 1, ba = bw * bh;
+    if (ba < 90 || ba < N * .0003 || ba > N * .22 || c.n / ba < 0.06) continue;
+    if (sb && (c.x0 + c.x1) / 2 > sb.x0 && (c.x0 + c.x1) / 2 < sb.x1 && (c.y0 + c.y1) / 2 > sb.y0 && (c.y0 + c.y1) / 2 < sb.y1) continue;
+    // the blur that stands for the ground bleeds a halo of ground pixels into the component around a strong
+    // element: shrink to the pixels that really differ from the ring colour, then judge the ring again
+    let r = ringOf(c.x0, c.y0, c.x1, c.y1); if (!r.rc || r.n < 12) continue;
+    const pix = c.pix.filter(i => cdist(px(D, i), r.rc) > 40); if (pix.length < 30) continue;
+    let x0 = ww, y0 = wh, x1 = 0, y1 = 0; for (const i of pix) { const x = i % ww, y = (i / ww) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    bw = x1 - x0 + 1; bh = y1 - y0 + 1; ba = bw * bh; if (ba < 60 || pix.length / ba < 0.06) continue;
+    r = ringOf(x0, y0, x1, y1); if (!r.rc || r.n < 12 || r.flat < lim.flat || r.spread > lim.ring) continue;
+    // a graphic is a few flat colours; picture detail shades continuously
+    const mc = medianColor(pix.filter((_, k) => k % 2 === 0).map(i => px(D, i))), pal = pix.reduce((s, i) => s + cdist(px(D, i), mc), 0) / pix.length;
+    if (pal > lim.pal) continue;
+    keep.push({ x0, y0, x1: x1 + 1, y1: y1 + 1, n: pix.length, ring: r.rc, pix });
+  }
+  // pieces of one mark (two crests, a broken stroke) join up
+  let merged = true;
+  while (merged) { merged = false; outer: for (let i = 0; i < keep.length; i++) for (let j = i + 1; j < keep.length; j++) { const a = keep[i], b = keep[j]; const P = 5; if (a.x0 - P < b.x1 && b.x0 - P < a.x1 && a.y0 - P < b.y1 && b.y0 - P < a.y1) { keep[i] = { x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1), n: a.n + b.n, ring: a.n >= b.n ? a.ring : b.ring, pix: a.pix.concat(b.pix) }; keep.splice(j, 1); merged = true; break outer; } } }
+  const out = [];
+  for (const c of keep) {
+    const bw = c.x1 - c.x0, bh = c.y1 - c.y0, ba = bw * bh; if (ba > N * .22) continue;
+    const aspect = bw / bh, rule = aspect >= 8 && bh <= wh * .015;
+    const inkc = medianColor(c.pix.filter((_, k) => k % 3 === 0).map(i => px(D, i)));
+    const pad = 3;
+    const bbox = { x0: Math.max(0, (c.x0 - pad) * inv), y0: Math.max(0, (c.y0 - pad) * inv), x1: Math.min(w, (c.x1 + pad) * inv), y1: Math.min(h, (c.y1 + pad) * inv) };
+    const W0 = Math.round(bw * inv), H0 = Math.round(bh * inv);
+    out.push({ kind: rule ? 'rule' : 'mark', on: true, bbox, raw: { w: bw * inv, h: bh * inv }, ring: c.ring, color: toHex(inkc), title: rule ? 'Rule' : 'Mark', meta: rule ? `${W0} × ${H0} px line · becomes a rule layer` : `${W0} × ${H0} px on flat ground · becomes a logo layer` });
+  }
+  return out.slice(0, 12);
+}
+/* Alpha for a mark: how far each pixel is from the ground colour under it. */
+function markCutout(SRC, e) {
+  const w = SRC.width, d = SRC.data, b = e.bbox, x0 = b.x0 | 0, y0 = b.y0 | 0, bw = Math.max(1, Math.round(b.x1 - b.x0)), bh = Math.max(1, Math.round(b.y1 - b.y0));
+  const c = document.createElement('canvas'); c.width = bw; c.height = bh; const x = c.getContext('2d'); const id = x.createImageData(bw, bh), o = id.data;
+  for (let y = 0; y < bh; y++) for (let xx = 0; xx < bw; xx++) { const i = (y0 + y) * w + (x0 + xx), j = (y * bw + xx) * 4, p = px(d, i); const t = clamp((cdist(p, e.ring) - 14) / 40, 0, 1); o[j] = p[0]; o[j + 1] = p[1]; o[j + 2] = p[2]; o[j + 3] = Math.round(255 * t * t * (3 - 2 * t)); }
+  x.putImageData(id, 0, 0); return c;
+}
+function subjectCutout(SRC, s) {
+  const w = SRC.width, d = SRC.data, b = s.bbox, x0 = b.x0, y0 = b.y0, bw = b.x1 - b.x0, bh = b.y1 - b.y0;
+  const c = document.createElement('canvas'); c.width = bw; c.height = bh; const x = c.getContext('2d'); const id = x.createImageData(bw, bh), o = id.data;
+  for (let y = 0; y < bh; y++) for (let xx = 0; xx < bw; xx++) { const i = (y0 + y) * w + (x0 + xx), j = (y * bw + xx) * 4; const v = s.mask[i] / 255; let a = clamp((v - 0.42) / 0.16, 0, 1); a = a * a * (3 - 2 * a); o[j] = d[i * 4]; o[j + 1] = d[i * 4 + 1]; o[j + 2] = d[i * 4 + 2]; o[j + 3] = Math.round(255 * a); }
+  x.putImageData(id, 0, 0); return c;
+}
+const canvasBlob = (c, type, q) => new Promise(r => c.toBlob(r, type, q));
+/* ---- build: assets, the plate, then the document ---- */
+async function decBuild() {
+  const R = DEC.res; if (!R || DEC.busy) return; DEC.busy = true; decBuildLabel();
+  try {
+    const SRC = DEC.src, w = R.w, h = R.h, en = R.elems.filter(e => e.on), t = decTarget();
+    const name = DEC.name || 'Picture';
+    // frame mapping: the plate fills the frame, centred, like every uploaded background
+    const s = Math.max(t.w / w, t.h / h), offX = (t.w - w * s) / 2, offY = (t.h - h * s) / 2;
+    const fx = X => offX + X * s, fy = Y => offY + Y * s;
+    decStatus('Cutting the elements out…');
+    const layers = [], assetsMade = [];
+    let subject = null;
+    for (const e of en) {
+      if (e.kind === 'text') {
+        // words on their own box come out the way the editor's CTA button is built: a thick rule under a text layer
+        if (e.box) { const b = e.box, bw = b.x1 - b.x0, bh = b.y1 - b.y0; layers.push(newRule({ x: +(fx(b.x0 + bw / 2) / t.w).toFixed(4), y: +(fy(b.y0 + bh / 2) / t.h).toFixed(4), width: +clamp(bw * s / t.w, 0.02, 1).toFixed(4), thick: Math.max(2, Math.round(bh * s)), color: b.color, alpha: 1 })); }
+        const l = newText({ text: e.text, font: e.font, weight: e.weight, italic: false, upper: false, size: Math.round(e.size * s), line: e.line, track: e.track, width: clamp(e.widthPx * s / t.w, 0.05, 1), align: e.align, color: e.color, shadow: 0, outline: 0, box: 'none', x: +(fx(e.anchorX) / t.w).toFixed(4), y: +(fy(e.top) / t.h).toFixed(4) });
+        layers.push(l);
+      } else if (e.kind === 'rule') {
+        const bw = e.bbox.x1 - e.bbox.x0, bh = e.bbox.y1 - e.bbox.y0;
+        layers.push(newRule({ x: +(fx(e.bbox.x0 + bw / 2) / t.w).toFixed(4), y: +(fy(e.bbox.y0 + bh / 2) / t.h).toFixed(4), width: +clamp((e.raw ? e.raw.w : bw) * s / t.w, 0.02, 1).toFixed(4), thick: Math.max(2, Math.round((e.raw ? e.raw.h : bh - 6) * s)), color: e.color, alpha: 1 }));
+      } else if (e.kind === 'mark') {
+        const c = markCutout(SRC, e), blob = await canvasBlob(c, 'image/png');
+        const rec = await store.putAsset(blob, 'logo', `${name} mark ${e.n}`); assetsMade.push(rec.id);
+        const bw = e.bbox.x1 - e.bbox.x0, bh = e.bbox.y1 - e.bbox.y0;
+        layers.push(newLogo({ image: rec.id, x: +(fx(e.bbox.x0 + bw / 2) / t.w).toFixed(4), y: +(fy(e.bbox.y0 + bh / 2) / t.h).toFixed(4), size: +clamp(bw * s / t.w, 0.02, 0.8).toFixed(4), alpha: 1 }));
+      } else if (e.kind === 'subject') {
+        const c = subjectCutout(SRC, e), blob = await canvasBlob(c, 'image/png');
+        const rec = await store.putAsset(blob, 'cutout', `${name} subject`); assetsMade.push(rec.id);
+        const bw = e.bbox.x1 - e.bbox.x0, bh = e.bbox.y1 - e.bbox.y0;
+        subject = { on: true, image: rec.id, scale: +clamp(bh * s / t.h, 0.05, 8).toFixed(4), x: +(fx(e.bbox.x0 + bw / 2) / t.w).toFixed(4), y: +(fy(e.bbox.y1) / t.h).toFixed(4), shadow: 0, sat: 1, flip: false };
+      }
+    }
+    decStatus('Cleaning the plate…'); await new Promise(r => setTimeout(r, 10));
+    const plate = new ImageData(new Uint8ClampedArray(SRC.data), w, h), hole = new Uint8Array(w * h);
+    for (const e of en) {
+      if (e.kind === 'text') {
+        if (e.box) { for (let y = Math.max(0, e.box.y0 | 0); y < Math.min(h, e.box.y1 + 1); y++) for (let x = Math.max(0, e.box.x0 | 0); x < Math.min(w, e.box.x1 + 1); x++) hole[y * w + x] = 1; }
+        else for (const L of e.lines) { const b = L.bbox; for (let y = Math.max(0, (b.y0 - 3) | 0); y < Math.min(h, b.y1 + 3); y++) for (let x = Math.max(0, (b.x0 - 3) | 0); x < Math.min(w, b.x1 + 3); x++) if (R.textMask[y * w + x]) hole[y * w + x] = 1; }
+      } else if (e.kind === 'mark' || e.kind === 'rule') {
+        const b = e.bbox; for (let y = Math.max(0, b.y0 | 0); y < Math.min(h, b.y1); y++) for (let x = Math.max(0, b.x0 | 0); x < Math.min(w, b.x1); x++) if (cdist(px(SRC.data, y * w + x), e.ring) > 14) hole[y * w + x] = 1;
+      }
+    }
+    const grown = dilate(hole, w, h, 2); bfsFill(plate.data, w, h, grown);
+    if (subject && DEC.plate === 'fill') { const sh = new Uint8Array(w * h); const sm = R.subj.mask; for (let i = 0; i < w * h; i++) sh[i] = sm[i] > 60 ? 1 : 0; blurFill({ width: w, height: h, data: plate.data }, dilate(sh, w, h, 4)); }
+    const pc = document.createElement('canvas'); pc.width = w; pc.height = h; pc.getContext('2d').putImageData(plate, 0, 0);
+    const plateRec = await store.putAsset(await canvasBlob(pc, 'image/jpeg', 0.93), 'bg', `${name} plate`); assetsMade.push(plateRec.id);
+    await preloadAssets(assetsMade);
+    layers.forEach(l => { if (l.type === 'text') ensureFont(l.font, l.weight, l.italic); });
+    layers.sort((a, b) => a.y - b.y);
+    // the document
+    const bg = { type: 'image', image: plateRec.id, fit: 'fill', pad: '#16150f', scale: 1, x: 0, y: 0, blur: 0, bright: 1, sat: 1 };
+    if (t.kind === 'apply') {
+      pushUndo(); doc.bg = { ...doc.bg, ...bg }; doc.overlay = { ...doc.overlay, type: 'none' }; doc.layers = layers; doc.subject = subject ? { ...doc.subject, ...subject } : { ...doc.subject, on: false };
+      commit(); syncAll(); refreshAssetSelects(); renderBgPick();
+    } else {
+      const d = baseDoc(name); d.bg = { ...d.bg, ...bg }; d.overlay = { ...d.overlay, type: 'none', opacity: 0 }; d.grain = 0; d.layers = layers;
+      d.subject = subject ? { ...d.subject, ...subject } : { ...d.subject, on: false };
+      if (t.kind !== 'cover') { d.w = t.w; d.h = t.h; }
+      if (t.kind === 'ad') {
+        const used = new Set(covers.filter(c => isAd(c.doc)).map(c => c.doc.ad.id)); let n = 1; while (used.has(`P${n}`)) n++;
+        d.name = `Static P${n} · ${name}`;
+        d.ad = { set: AD_SET, rev: AD_LAYOUT, key: `imported:P${n}:x${uid()}`, setKey: 'imported', id: `P${n}`, name, layout: 'cover', frame: t.frame, ver: '01', flag: '', pair: '', ctaRef: '', dir: 'Broken down from a picture' };
+      } else if (t.kind === 'slide') {
+        const n = Math.max(0, ...postGroups().map(g => g.n || 0)) + 1, cid = 'c' + uid();
+        d.name = `${String(n).padStart(2, '0')}.1 · ${name}`;
+        d.post = { set: POST_SET, key: `${cid}:x${uid()}`, cid, n, slide: 1, of: 1, style: 'photo', title: name, category: '', insight: '', pick: '', visual: 'Broken down from a picture', photo: '' };
+      }
+      d.createdAt = d.updatedAt = Date.now();
+      const rec = coverRecord(d); covers.push(rec); await store.saveCovers([rec]);
+      if (t.kind === 'cover') { settings.gridOrder = [d.id, ...(settings.gridOrder || [])]; saveSettingsSoon(); }
+      loadDoc(d);
+    }
+    deconEl.close(); switchView('editor'); refreshAssetSelects(); renderBgPick();
+    toast(`${layers.length} layer${layers.length === 1 ? '' : 's'}${subject ? ' + the subject' : ''} on a clean plate — drag anything`);
+  } catch (e) { console.warn(e); decStatus('Building failed: ' + (e.message || e), 'warn'); }
+  DEC.busy = false; decBuildLabel();
+}
+$('#bgDeconstruct').onclick = () => {
+  const a = doc.bg.type === 'image' && assets[doc.bg.image], im = a && getImg(doc.bg.image);
+  if (im && im.naturalWidth) decOpen(im, { name: a.name, target: 'apply' }); else decOpen(null, { target: 'apply' });
+};
+$('#btnAdFromImage').onclick = () => decOpen(null, { target: 'ad' });
+$('#btnPostFromImage').onclick = () => decOpen(null, { target: 'slide' });
+$('#btnCoverFromImage').onclick = () => decOpen(null, { target: 'cover' });
+
 /* ---------------- views ---------------- */
 function switchView(v) {
   $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.view === v));
@@ -3381,6 +4150,7 @@ document.fonts.addEventListener('loadingdone', () => { renderAll(); renderCoverL
 
 /* A read-only handle on the live state, for the console and for tests. */
 window.__rcs = { get settings() { return settings; }, get covers() { return covers; }, get doc() { return doc; }, get spanOpts() { return spanOpts; }, get mosaicOpts() { return mosaicOpts; }, assetsOf, setSpanAt, switchView, adGroups, renderAds, renderBlob,
+  get ORG() { return ORG; }, get DEC() { return DEC; }, deleteRecs, moveToAlbum, setFav, setLabel, newAlbum, decOpen, decLoad, decAnalyse, decBuild, orgRerender,
   // test hook: the drawn box of every layer of a doc, at 1:1
   layerBoxes(d) { const b = {}, sz = sizeOf(d), c = document.createElement('canvas'); c.width = sz.w; c.height = sz.h; render(c.getContext('2d'), d, 1, b); return b; } };
 
