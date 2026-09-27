@@ -123,6 +123,7 @@ const BUILTIN = {
    full plate is only fetched when a cover uses it. `group` names their library group. */
 for (const p of window.__PEOPLE_PHOTOS__ || []) BUILTIN[p.id] = { id: p.id, kind: 'photo', name: p.name, url: p.url, thumb: p.thumb, group: p.group, builtin: true };
 for (const p of [].concat(window.__DAY1_STILLS__ || [], (window.__RTS_ADS__ || {}).plates || [])) BUILTIN[p.id] = { id: p.id, kind: 'photo', name: p.name, url: p.url, thumb: p.thumb, group: p.group, builtin: true };
+for (const p of (window.__RTS_FINAL__ || {}).boards || []) BUILTIN[p.id] = { id: p.id, kind: 'photo', name: p.name, url: p.url, thumb: p.thumb, group: 'Final submission', builtin: true };
 const BUILTIN_NAMES = new Set(Object.values(BUILTIN).map(a => a.name));
 /* A photo someone imported by folder before it was built in: still loaded, because a cover may
    point at it, but kept out of the library so the picture is not listed twice. */
@@ -3235,20 +3236,69 @@ async function fixAdLines() {
 /* ---------------- the static ads view ---------------- */
 const adIdKey = id => String(id).replace(/\d+/g, m => m.padStart(3, '0'));
 const adFrameRank = f => Object.keys(AD_FRAMES).indexOf(f);
+/* The submission set (final.js) sits first; then the sets in ads.js order; then anything else (imported). Inside a
+   set a board with a hand-set `ad.order` (from a drag) comes before the rest, which keep id order. */
+const FINAL_KEY = 'final';
+const rtsFinal = () => window.__RTS_FINAL__ || { key: FINAL_KEY, set: '', title: 'FINAL ADS SUBMISSION', boards: [] };
+const adOrderOf = a => (typeof a.order === 'number' ? a.order : 1e9);
+function adSetMeta(setKey) {
+  const cfg = rtsAds(), m = (cfg.sets || []).find(s => s.key === setKey);
+  if (m) return m;
+  if (setKey === FINAL_KEY) { const f = rtsFinal(); return { key: FINAL_KEY, title: f.title || 'FINAL ADS SUBMISSION', note: f.note || '', ver: '01', final: true }; }
+  if (setKey === 'imported') return { key: 'imported', title: 'Imported boards', note: 'Pictures broken down into layers with Break down a picture. Each board is an ordinary editable ad.', ver: '01' };
+  return { key: setKey, title: `Static set ${setKey}`, ver: '01' };
+}
 function adGroups() {
-  const cfg = rtsAds(), order = new Map((cfg.sets || []).map((s, i) => [s.key, i]));
+  const cfg = rtsAds(), order = new Map((cfg.sets || []).map((s, i) => [s.key, i + 1])); order.set(FINAL_KEY, 0);
   const by = new Map();
   for (const c of covers) {
     const a = c.doc && c.doc.ad; if (!a) continue;
     let g = by.get(a.setKey);
     if (!g) {
-      const meta = (cfg.sets || []).find(s => s.key === a.setKey) || {};
-      by.set(a.setKey, g = { key: a.setKey, title: meta.title || (a.setKey === 'imported' ? 'Imported boards' : `Static set ${a.setKey}`), date: meta.date || '', note: meta.note || (a.setKey === 'imported' ? 'Pictures broken down into layers with Break down a picture. Each board is an ordinary editable ad.' : ''), ver: meta.ver || a.ver || '01', boards: [] });
+      const meta = adSetMeta(a.setKey);
+      by.set(a.setKey, g = { key: a.setKey, title: meta.title, date: meta.date || '', note: meta.note || '', ver: meta.ver || a.ver || '01', final: !!meta.final, boards: [] });
     }
     g.boards.push(c);
   }
-  for (const g of by.values()) g.boards.sort((x, y) => adIdKey(x.doc.ad.id).localeCompare(adIdKey(y.doc.ad.id)) || adFrameRank(x.doc.ad.frame) - adFrameRank(y.doc.ad.frame));
+  for (const g of by.values()) g.boards.sort((x, y) => adOrderOf(x.doc.ad) - adOrderOf(y.doc.ad) || adIdKey(x.doc.ad.id).localeCompare(adIdKey(y.doc.ad.id)) || adFrameRank(x.doc.ad.frame) - adFrameRank(y.doc.ad.frame));
   return [...by.values()].sort((x, y) => (order.has(x.key) ? order.get(x.key) : 99) - (order.has(y.key) ? order.get(y.key) : 99));
+}
+/* Every set a board can be moved to: the ones on the tab, plus the submission set even before it has a board. */
+function adSetChoices() { const g = adGroups().map(x => ({ key: x.key, title: x.title })); if (!g.some(x => x.key === FINAL_KEY)) g.unshift({ key: FINAL_KEY, title: adSetMeta(FINAL_KEY).title }); return g; }
+/* Move boards into a set, before `beforeId` (or at the end), and write the order of the whole target set. A moved
+   board keeps its id and its ad.key, so the seeders still see it as present and never rebuild it in its old set. */
+async function moveToSet(recs, setKey, beforeId) {
+  recs = recs.filter(r => isAd(r.doc)); if (!recs.length) return;
+  const moving = new Set(recs.map(r => r.id));
+  const cur = (adGroups().find(g => g.key === setKey) || { boards: [] }).boards.filter(r => !moving.has(r.id));
+  let at = beforeId ? cur.findIndex(r => r.id === beforeId) : -1; if (at < 0) at = cur.length;
+  const seq = [...cur.slice(0, at), ...recs, ...cur.slice(at)];
+  seq.forEach((r, i) => { const d = r.id === doc?.id ? doc : r.doc; d.ad = { ...d.ad, setKey, order: i }; if (r.id === doc?.id) r.doc = JSON.parse(JSON.stringify(doc)); r.updatedAt = d.updatedAt = Date.now(); });
+  await store.saveCovers(seq);
+  const to = adSetMeta(setKey).title;
+  renderAds(); renderCoverList(); toast(recs.length === 1 ? `${recs[0].doc.ad.id} → ${to}` : `${recs.length} boards → ${to}`);
+}
+/* The submission set: one board per picture in final.js, the picture as the whole board. Only boards whose key is
+   missing are added, so an edited, moved or deleted one is never brought back (bump `set` in final.js to add new pictures). */
+const FINAL_SET = (window.__RTS_FINAL__ || {}).set || '';
+async function seedFinalSet() {
+  const f = rtsFinal(); if (!f.boards || !f.boards.length) return false;
+  const have = new Set(covers.filter(c => c.doc && c.doc.ad).map(c => c.doc.ad.key));
+  let t = Math.min(Date.now(), ...covers.map(c => c.createdAt || Date.now())) - 36e5;
+  const recs = [];
+  f.boards.forEach((b, i) => {
+    const key = `${FINAL_KEY}:${b.id}:4x5`; if (have.has(key)) return;
+    const d = baseDoc(`Static ${b.id} · ${b.name}`); d.w = 1080; d.h = 1350;
+    d.subject = { ...d.subject, on: false }; d.grain = 0;
+    d.bg = { ...d.bg, type: 'image', image: b.id, fit: 'fill', scale: 1, x: 0, y: 0, blur: 0, bright: 1, sat: 1, pad: RTS.ink };
+    d.overlay = { type: 'none', color: '#0c0905', opacity: 0 };
+    d.layers = [];
+    d.ad = { set: FINAL_SET, rev: AD_LAYOUT, key, setKey: FINAL_KEY, id: b.id, name: b.name, layout: 'photo', frame: '4x5', ver: '01', flag: '', pair: '', ctaRef: '', dir: b.src ? `From Downloads · ${b.src}` : '', order: i };
+    d.createdAt = d.updatedAt = t++; recs.push(coverRecord(d));
+  });
+  if (recs.length) { await store.saveCovers(recs); covers = covers.concat(recs); }
+  settings.finalSet = FINAL_SET; await store.saveSettings(settings).catch(() => {});
+  return recs.length > 0;
 }
 let adFilter = 'all';
 function renderAds() {
@@ -3279,14 +3329,19 @@ function renderAds() {
 function adCard(g) {
   const el = document.createElement('article'); el.className = 'pcard acard'; el.dataset.set = g.key;
   const head = document.createElement('header'), meta = document.createElement('div');
-  meta.innerHTML = `<span class="kicker">${escapeHtml(g.date)}${g.date ? ' · ' : ''}exports as v${escapeHtml(g.ver)}</span>`
-    + `<h3>${escapeHtml(g.title)}</h3>`
+  meta.innerHTML = `<span class="kicker">${g.final ? `${g.boards.length} board${g.boards.length === 1 ? '' : 's'} · in the order shown` : `${escapeHtml(g.date)}${g.date ? ' · ' : ''}exports as v${escapeHtml(g.ver)}`}</span>`
+    + `<h3>${escapeHtml(g.title)}${g.final ? '<em>CLIENT SUBMISSION</em>' : ''}</h3>`
     + (g.note ? `<p class="insight">${escapeHtml(g.note)}</p>` : '');
   const acts = document.createElement('div'); acts.className = 'acts';
-  acts.innerHTML = '<button class="small">Export set</button><button class="small ghost">+ Board</button>';
+  acts.innerHTML = `<button class="small${g.final ? ' primary' : ''}">${g.final ? 'Export submission' : 'Export set'}</button><button class="small ghost">+ Board</button>`;
   const [exp, add] = $$('button', acts);
   exp.onclick = () => exportAdSet(g); add.onclick = () => newAdBoard(g);
   head.append(meta, acts); el.appendChild(head);
+  if (g.final) el.classList.add('final');
+  // a board dragged onto the card (its header, or the space after the tiles) joins this set at the end
+  el.addEventListener('dragover', e => { if (!dtHasRcs(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; el.classList.add('dropin'); });
+  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) el.classList.remove('dropin'); });
+  el.addEventListener('drop', e => { if (!dtHasRcs(e)) return; e.preventDefault(); e.stopPropagation(); el.classList.remove('dropin'); $$('.pslide.dropbefore', el).forEach(x => x.classList.remove('dropbefore')); let ids = []; try { ids = JSON.parse(e.dataTransfer.getData('text/rcs')); } catch {} const before = e.target.closest('.pslide.ad'); moveToSet(ids.map(recOf).filter(Boolean), g.key, before ? before.dataset.id : null); });
   const row = document.createElement('div'); row.className = 'pslides';
   const frames = new Map();
   g.boards.forEach(r => { const a = r.doc.ad; if (!frames.has(a.id)) frames.set(a.id, new Set()); frames.get(a.id).add(a.frame); });
@@ -3306,7 +3361,9 @@ function adTile(r, have) {
     + (a.dir ? `<span class="dir">${escapeHtml(a.dir)}</span>` : '')
     + (a.flag ? `<span class="flag">~ ${escapeHtml(a.flag)}</span>` : '');
   el.append(b, cap); orgDecor(el, r, 'ads');
-  if (a.frame === '4x5') {
+  el.addEventListener('dragover', e => { if (!dtHasRcs(e)) return; $$('.pslide.dropbefore').forEach(x => { if (x !== el) x.classList.remove('dropbefore'); }); el.classList.add('dropbefore'); });
+  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) el.classList.remove('dropbefore'); });
+  if (a.frame === '4x5' && a.layout !== 'photo') {
     const vars = document.createElement('div'); vars.className = 'vars';
     for (const [k, f] of Object.entries(AD_FRAMES)) {
       if (k === '4x5' || (have && have.has(k))) continue;
@@ -3326,8 +3383,9 @@ async function exportAdSet(g) {
   setStatus('rendering…'); toast(`Rendering ${g.boards.length} boards…`);
   await loadAdFonts(); await awaitSlidePhotos(adDocs(g));
   const zip = new JSZip();
-  for (const d of adDocs(g)) zip.file(`${adFile(d)}.png`, await renderBlob(d, 1));
-  const ok = await store.download(`static-set-${g.key}-${new Date().toISOString().slice(0, 10)}.zip`, await zip.generateAsync({ type: 'blob' }));
+  const docs = adDocs(g);
+  for (let i = 0; i < docs.length; i++) { const d = docs[i]; zip.file(g.final ? `${String(i + 1).padStart(2, '0')} - ${d.ad.name.replace(/[\\/:*?"<>|]+/g, '').trim()}.png` : `${adFile(d)}.png`, await renderBlob(d, 1)); }
+  const ok = await store.download(g.final ? `FINAL ADS SUBMISSION - ${new Date().toISOString().slice(0, 10)}.zip` : `static-set-${g.key}-${new Date().toISOString().slice(0, 10)}.zip`, await zip.generateAsync({ type: 'blob' }));
   setStatus('saved · this browser', 'ok'); toast(ok ? `${g.boards.length} boards exported` : 'Export cancelled');
 }
 async function exportAllAds() {
@@ -3524,6 +3582,11 @@ function orgMenuItems(recs, opts = {}) {
   albums().forEach(a => items.push({ label: a.name, dot: a.color, on: album === a.id, run: () => moveToAlbum(recs, album === a.id ? null : a.id) }));
   items.push({ label: '+ New album…', icon: '+', run: () => { const a = newAlbum(); if (a) moveToAlbum(recs, a.id); } });
   if (album) items.push({ label: 'Take out of its album', icon: '○', run: () => moveToAlbum(recs, null) });
+  if (recs.every(x => isAd(x.doc))) {
+    items.push({ head: 'Set' });
+    const cur = one ? r.doc.ad.setKey : null;
+    adSetChoices().forEach(s => items.push({ label: s.title.replace(/ — .*$/, ''), icon: s.key === FINAL_KEY ? '★' : '▦', on: cur === s.key, disabled: cur === s.key, run: () => moveToSet(recs, s.key) }));
+  }
   items.push('-');
   if (one) items.push({ label: 'Duplicate', icon: '⧉', run: () => duplicateRec(r) });
   items.push({ label: one ? 'Export' : `Export ${recs.length}`, icon: '⤓', run: () => exportRecs(recs, one ? slug(r.name) : 'selection') });
@@ -4150,7 +4213,7 @@ document.fonts.addEventListener('loadingdone', () => { renderAll(); renderCoverL
 
 /* A read-only handle on the live state, for the console and for tests. */
 window.__rcs = { get settings() { return settings; }, get covers() { return covers; }, get doc() { return doc; }, get spanOpts() { return spanOpts; }, get mosaicOpts() { return mosaicOpts; }, assetsOf, setSpanAt, switchView, adGroups, renderAds, renderBlob,
-  get ORG() { return ORG; }, get DEC() { return DEC; }, deleteRecs, moveToAlbum, setFav, setLabel, newAlbum, decOpen, decLoad, decAnalyse, decBuild, orgRerender,
+  get ORG() { return ORG; }, get DEC() { return DEC; }, deleteRecs, moveToAlbum, setFav, setLabel, newAlbum, decOpen, decLoad, decAnalyse, decBuild, orgRerender, moveToSet, adSetChoices, seedFinalSet,
   // test hook: the drawn box of every layer of a doc, at 1:1
   layerBoxes(d) { const b = {}, sz = sizeOf(d), c = document.createElement('canvas'); c.width = sz.w; c.height = sz.h; render(c.getContext('2d'), d, 1, b); return b; } };
 
@@ -4173,6 +4236,7 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   if (settings.postSet !== POST_SET) { try { await seedPostSet(); } catch (e) { console.warn('post set', e); } }
   if (settings.adSet !== AD_SET || settings.adLayout !== AD_LAYOUT) { try { await seedAdSet(); } catch (e) { console.warn('ad set', e); } }
   if (settings.adLines !== 2) { try { await fixAdLines(); } catch (e) { console.warn('ad lines', e); } }
+  if (FINAL_SET && settings.finalSet !== FINAL_SET) { try { await seedFinalSet(); } catch (e) { console.warn('final set', e); } }
   if (settings.adSig !== AD_SIG) { try { await enlargeAdSigs(); } catch (e) { console.warn('ad footer', e); } }
   const todo = location.hash === '#todo';
   if (todo && settings.reelSet !== REEL_SET) { try { await seedReelSet(); } catch (e) { console.warn('reel set', e); } }

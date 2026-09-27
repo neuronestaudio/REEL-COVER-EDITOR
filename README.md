@@ -184,6 +184,19 @@ size chosen in the header.
 
 **Export** — 1080×1920 or 2160×3840 PNG, JPG, the selected covers, or a ZIP of every cover.
 
+**FINAL ADS SUBMISSION** — the first set on the Static Ads tab is the client submission. It is
+seeded from `final.js` + `assets/final/` (the 23 finished boards Dion collected in
+`Downloads\Statics Ads 1` and `Statics Ads 2`, rebuilt as 1080-wide JPEGs and listed in the photo
+library under *Final submission*): each is a board with the picture as the whole board and no
+layers, so it exports exactly as it is. **Any board from any other set can be moved in** — drag
+its tile onto the submission card (or onto a tile inside it, to land before that one), or use
+the tile's ⋯ menu → *Set*; drag within the set to put it in order. A moved board keeps its id and
+its seed key, so the seeders never rebuild it in its old set; the order is `ad.order`, written for
+the whole target set on every move. **Export submission** gives `FINAL ADS SUBMISSION - <date>.zip`
+with the files numbered in that order. Bump `set` in `final.js` after adding pictures to the
+manifest to seed them into browsers that already hold the set; edited, moved or deleted boards
+are never brought back.
+
 **Organise: albums, favourites, labels** — every tile in the studio (a cover in the rail, a
 carousel slide, a static ad board) carries the same corner controls: a star, a ⋯ menu and, in
 Select mode, a tick. The bar above each list filters by **★ Favourites**, by **album** and by
@@ -265,6 +278,7 @@ app.js       renderer, editor, storage, export, organiser (albums/favourites/lab
 assets/      shipped photo, studio-grade cutout, mosaic source
 assets/stills/  day-1 REEL COVER stills (the default batch photo set)
 captions.js  the 72 cover captions, with hand-set line breaks
+final.js     the FINAL ADS SUBMISSION manifest (23 boards) · assets/final/  their 1080-wide plates and thumbs
 statics.js   the static-set boards (copy, plate, layout): v3, the "if this is you" 3x3 mosaic (nine tiles of one picture); v2, 18 on self-worth from the 26 Aug stills; v1, 18 from Nathan's videos
 assets/statics/  static-set plates · assets/brand/  Harrison's marks
 mp/          MediaPipe Selfie Segmentation runtime and models (~12 MB)
