@@ -442,7 +442,10 @@ function drawText(x, l, hi) {
 }
 function drawRule(x, l) {
   const w = l.width * W, X = l.x * W - w / 2, Y = l.y * H;
-  x.save(); x.fillStyle = hexA(l.color, l.alpha); x.fillRect(X, Y - l.thick / 2, w, l.thick); x.restore();
+  x.save(); x.fillStyle = hexA(l.color, l.alpha);
+  if (l.r > 0) { roundRect(x, X, Y - l.thick / 2, w, l.thick, l.r); x.fill(); }
+  else x.fillRect(X, Y - l.thick / 2, w, l.thick);
+  x.restore();
   return { x: X, y: Y - Math.max(l.thick / 2, 14), w, h: Math.max(l.thick, 28) };
 }
 function drawLogo(x, l) {
@@ -481,7 +484,7 @@ const GRADS = [['#0f3b3a', '#16150f'], ['#2b2b6d', '#0b0a1a'], ['#d9a441', '#7a4
 function newText(o = {}) {
   return Object.assign({ id: uid(), type: 'text', text: 'Caption', font: 'Fraunces', weight: 600, italic: false, upper: false, size: 110, line: 1.02, track: -0.02, width: 0.86, align: 'left', color: '#ffffff', spans: [], x: 0.07, y: 0.62, box: 'none', boxColor: '#16150f', boxAlpha: 0.65, shadow: 0.35, outline: 0, rot: 0, behind: false }, o);
 }
-function newRule(o = {}) { return Object.assign({ id: uid(), type: 'rule', x: 0.5, y: 0.6, width: 0.86, thick: 4, color: '#ffffff', alpha: .8 }, o); }
+function newRule(o = {}) { return Object.assign({ id: uid(), type: 'rule', x: 0.5, y: 0.6, width: 0.86, thick: 4, color: '#ffffff', alpha: .8, r: 0 }, o); }
 function newLogo(o = {}) { return Object.assign({ id: uid(), type: 'logo', image: null, x: 0.5, y: 0.1, size: 0.22, alpha: 1, invert: false }, o); }
 function baseDoc(name) {
   return {
@@ -1351,6 +1354,7 @@ bound.push(bindToggle('tBehind', () => T()?.behind, v => { const l = T(); if (l)
 const R = () => { const l = L(); return l && l.type === 'rule' ? l : null; };
 bound.push(bindRange('rWidth', () => R()?.width, v => { const l = R(); if (l) l.width = v; }, v => Math.round(v * 100) + '%'));
 bound.push(bindRange('rThick', () => R()?.thick, v => { const l = R(); if (l) l.thick = v; }));
+bound.push(bindRange('rRadius', () => R()?.r || 0, v => { const l = R(); if (l) l.r = v; }));
 bound.push(bindColor('rColor', () => R()?.color, v => { const l = R(); if (l) l.color = v; }));
 bound.push(bindRange('rAlpha', () => R()?.alpha, v => { const l = R(); if (l) l.alpha = v; }));
 // logo props
@@ -2720,13 +2724,19 @@ function finalCtaLayers(box, text) {
   const width = s => { const l = newText({ font: RTS.font, weight: 600, size: s, track: 0.2, line: 1.2, upper: true, text: t }); probe.font = fontString(l); probe.letterSpacing = `${0.2 * s}px`; return probe.measureText(t.toUpperCase()).width; };
   let size = Math.min(26, Math.max(13, Math.round(box.h * 0.42)));
   while (size > 12 && width(size) > room) size--;
-  const rule = newRule({ x: box.x, y: box.y, width: box.w, thick: box.h, color: RTS.red, alpha: 1 });
+  /* The bar underneath is printed on the picture with square corners, so a rounded
+     bar of the same size would just expose them. Growing it by its own radius puts
+     the old corners exactly on the centre of each curve, inside the new shape. */
+  const r = Math.min(16, Math.max(9, Math.round(box.h * 0.22)));
+  const rule = newRule({ x: box.x, y: box.y, width: box.w + 2 * r / W, thick: box.h + 2 * r, color: RTS.red, alpha: 1, r });
   const cta = newText({ font: RTS.font, align: 'center', x: box.x, width: box.w, text: t, weight: 600, size,
     track: 0.2, line: 1.2, upper: true, color: RTS.white, shadow: 0, box: 'none', outline: 0, behind: false });
   cta.y = (box.y * H - size * 1.2 / 2) / H;
   rule.role = 'finalcta'; cta.role = 'finalcta';
   return [rule, cta];
 }
+/* `text` null re-lays every board with the wording it already carries, which is
+   how the shape can be changed without overwriting a line someone has edited. */
 async function applyFinalCta(text) {
   const recs = covers.filter(c => c.doc && c.doc.ad && c.doc.ad.setKey === FINAL_KEY);
   if (!recs.length) return 0;
@@ -2736,14 +2746,26 @@ async function applyFinalCta(text) {
   for (const r of recs) {
     const b = byId.get(r.doc.ad.id); if (!b || !b.cta) continue;   // f01 carries no call to action
     const d = r.id === doc?.id ? doc : r.doc;
+    const had = (d.layers || []).find(l => l.role === 'finalcta' && l.type === 'text');
+    const line = text || (had && had.text) || settings.finalCtaText || FINAL_CTA;
     d.layers = (d.layers || []).filter(l => l.role !== 'finalcta');
-    d.layers.push(...withSize(d, () => finalCtaLayers(b.cta, text)));
+    d.layers.push(...withSize(d, () => finalCtaLayers(b.cta, line)));
     d.updatedAt = r.updatedAt = Date.now(); r.doc = d; n++;
   }
   await store.saveCovers(recs);
-  settings.finalCtaText = text; saveSettingsSoon();
+  if (text) settings.finalCtaText = text;
+  saveSettingsSoon();
   renderAll(); renderAds(); renderCtas();
   return n;
+}
+const FINAL_CTA_ROUND = 'round-1';
+async function seedFinalCtaRound() {
+  if (settings.finalCtaRound === FINAL_CTA_ROUND) return false;
+  const n = await applyFinalCta(null);          // null: keep whatever each board says
+  if (!n) return false;
+  settings.finalCtaRound = FINAL_CTA_ROUND;
+  await store.saveSettings(settings).catch(() => {});
+  return true;
 }
 async function seedFinalCta() {
   if (settings.finalCtaRev === FINAL_CTA_REV) return false;
@@ -4333,6 +4355,7 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   if (settings.adLines !== 2) { try { await fixAdLines(); } catch (e) { console.warn('ad lines', e); } }
   if (FINAL_SET && settings.finalSet !== FINAL_SET) { try { await seedFinalSet(); } catch (e) { console.warn('final set', e); } }
   try { await seedFinalCta(); } catch (e) { console.warn('final cta', e); }
+  try { await seedFinalCtaRound(); } catch (e) { console.warn('final cta round', e); }
   if (settings.adSig !== AD_SIG) { try { await enlargeAdSigs(); } catch (e) { console.warn('ad footer', e); } }
   const todo = location.hash === '#todo';
   if (todo && settings.reelSet !== REEL_SET) { try { await seedReelSet(); } catch (e) { console.warn('reel set', e); } }

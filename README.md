@@ -146,7 +146,18 @@ the exact size of the old one, in the same vermilion, with the line centred on i
 carries that rectangle (`cta`) and the old wording (`ctaNow`) for every board, measured from the
 picture. **Submission CTA** on the set card sets the line for the whole set; `FINAL_CTA` is what
 a browser seeds with and bumping `FINAL_CTA_REV` pushes a new line to browsers that already hold
-the set. Three boards needed their rectangle widened by hand because the call to action ran past
+the set. Applying with no line at all re-lays every board with the wording it already carries,
+which is how the shape can be changed without overwriting a line someone has edited by hand
+(`FINAL_CTA_ROUND` does exactly that).
+
+**The bar has rounded ends.** A rule now takes a corner radius (`r`, with a **Corners** slider in
+the rule panel); it defaults to 0, so every board drawn before this is untouched. The submission's
+bar is rounded and **grown by its own radius**, because the printed bar underneath has square
+corners and a rounded bar of the same size would simply expose them — growing it puts those
+corners on the centre of each curve, inside the new shape. Seven boards (F03, F04, F05, F06, F07,
+F09 and F14) carry a bar that runs the full width of the picture, so it has no corners on the
+canvas and still reads square; rounding those would mean shrinking the bar and exposing the
+printed red at both ends. Three boards needed their rectangle widened by hand because the call to action ran past
 the bar: F16 has the button as plain text under it, F17 puts only the first of two lines on the
 bar, and F06 and F07 are faulty exports where the bar sits across the middle of the line with a
 dead layer reading *and regulate your fear* underneath. F01 is a bare portrait with no call to
