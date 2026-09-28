@@ -140,6 +140,11 @@ try {
   sharedLocal = new Set(JSON.parse(localStorage.getItem('rcs.sharedLocal') || '[]'));
 } catch {}
 function sharedLocalAdd(id) { sharedLocal.add(id); try { localStorage.setItem('rcs.sharedLocal', JSON.stringify([...sharedLocal])); } catch {} }
+/* The clean plates behind the FINAL ADS SUBMISSION boards (final.js): each take's
+   own picture with the printed type erased, so the board can carry live text. */
+for (const b of (window.__RTS_FINAL__ || {}).boards || []) {
+  if (b.plate) BUILTIN['plate' + b.id] = { id: 'plate' + b.id, kind: 'photo', name: `Plate · ${b.name}`, url: b.plate, thumb: b.thumb, group: 'Plates', builtin: true };
+}
 let assets = { ...BUILTIN, ...SHARED };
 const imgCache = {};
 function getImg(id) {
@@ -2822,6 +2827,55 @@ async function applyFinalCta(text) {
   renderAll(); renderAds(); renderCtas();
   return n;
 }
+/* Every submission board that has a plate becomes a REAL ad board: the take's own
+   picture with the printed type erased as the background, and the words as live
+   layers — head, sub, kicker, the CTA button — laid out by adLayers, so the text
+   is editable like any other static ad and Submission CTA / CTA badges work on
+   it. The wording comes from the board's source copy (ads.js / statics.js), with
+   final.js overrides for the takes whose words were edited before export; the
+   button keeps whatever the call to action on the board says now. A board
+   someone has already made editable, or edited by hand, is never rebuilt. */
+const FINAL_EDIT = 'edit-1';
+async function seedFinalEditable() {
+  if (settings.finalEdit === FINAL_EDIT) return false;
+  const fin = rtsFinal(); if (!fin.boards || !fin.boards.some(b => b.plate)) return false;
+  const recs = covers.filter(c => c.doc && c.doc.ad && c.doc.ad.setKey === FINAL_KEY);
+  if (!recs.length) return false;
+  if (!(await adFontsReady())) return false;
+  await preloadAssets(['rtsMark', 'rtsShinbukan', 'rtsSeizanji']);
+  const byId = new Map(fin.boards.map(b => [b.id, b]));
+  const changed = [];
+  for (const r of recs) {
+    const b = byId.get(r.doc.ad.id);
+    if (!b || !b.plate || !b.edit) continue;
+    const d = r.id === doc?.id ? doc : r.doc;
+    if ((d.layers || []).some(l => l.role === 'head')) continue;      // already editable
+    const had = (d.layers || []).find(l => l.role === 'finalcta' && l.type === 'text');
+    const ctaText = (had && had.text) || settings.finalCtaText || FINAL_CTA;
+    const setKey = b.edit.setKey, cfg = adBoardCfg(setKey, b.code) || {};
+    const src = { ...adSource(setKey, b.code), ...(b.edit.copy || {}) };
+    let layout = cfg.layout || src.layout || 'cover';
+    if (layout === 'type') layout = 'cover';    // every take sits on a photograph, never the quiet type plate
+    d.bg = { ...d.bg, type: 'image', image: 'plate' + b.id, fit: 'fill', scale: 1, x: 0, y: 0, blur: 0, bright: 1, sat: 1, pad: RTS.ink };
+    d.overlay = { type: 'none', color: '#0c0905', opacity: 0 };       // the printed scrim is part of the plate
+    d.grain = 0;
+    withSize(d, () => {
+      d.layers = adLayers({ name: d.ad.name, kicker: src.kicker, head: src.head, sub: src.sub, line: '', cta: ctaText, layout });
+      const btn = d.layers.find(l => l.type === 'rule' && l.role === 'button');
+      if (btn) btn.r = 12;                                            // the round ends Dion asked for
+    });
+    d.ad.layout = layout; d.ad.rev = AD_LAYOUT;
+    if (b.edit.rough) { d.ad.flag = d.ad.flag || 'plate has visible retouching — check before it ships'; }
+    d.updatedAt = r.updatedAt = Date.now(); r.doc = d;
+    changed.push(r);
+  }
+  if (changed.length) await store.saveCovers(changed);
+  settings.finalEdit = FINAL_EDIT;
+  await store.saveSettings(settings).catch(() => {});
+  if (doc && changed.some(r => r.id === doc.id)) loadDoc(covers.find(c => c.id === doc.id).doc);
+  renderAds();
+  return changed.length > 0;
+}
 const FINAL_CTA_ROUND = 'round-1';
 async function seedFinalCtaRound() {
   if (settings.finalCtaRound === FINAL_CTA_ROUND) return false;
@@ -4072,7 +4126,10 @@ async function decOcr(SRC, onProgress) {
   paint(dark);
   let ls = await run(3);
   ls = mergeLines(ls, await run(11));   // sparse mode picks up the lines auto layout skips: a button, a small footer
-  if (good(ls) < 3) { paint(!dark); ls = mergeLines(ls, await run(3)); }
+  /* The other polarity always runs too: type sitting on a BRIGHT patch of a dark
+     picture was invisible to the main pass, and the old under-3-words gate meant
+     it was never looked for once the dark areas had read well. */
+  paint(!dark); ls = mergeLines(ls, await run(3)); ls = mergeLines(ls, await run(11));
   ls.forEach(l => { const sc = b => ({ x0: b.x0 / k, y0: b.y0 / k, x1: b.x1 / k, y1: b.y1 / k }); l.bbox = sc(l.bbox); l.words.forEach(wd => { wd.bbox = sc(wd.bbox); }); });
   ls = ls.filter(l => l.bbox.y1 - l.bbox.y0 >= 7 && l.bbox.y1 - l.bbox.y0 < h * .5 && l.bbox.x1 - l.bbox.x0 >= 4);
   // a lone glyph taller than every real line of type is a mark the reader took for a letter (a ring for a C);
@@ -4084,7 +4141,7 @@ function linesOf(data) {
   const raw = data.blocks ? data.blocks.flatMap(b => (b.paragraphs || []).flatMap(p => p.lines || [])) : (data.lines || []);
   const out = [];
   for (const ln of raw) {
-    const words = (ln.words || []).filter(wd => wd.confidence >= 52 && /[A-Za-z0-9]/.test(wd.text) && wd.bbox && wd.bbox.x1 > wd.bbox.x0);
+    const words = (ln.words || []).filter(wd => wd.confidence >= (DEC.minConf || 52) && /[A-Za-z0-9]/.test(wd.text) && wd.bbox && wd.bbox.x1 > wd.bbox.x0);   // DEC.minConf: erasure wants every glyph, however badly it read
     if (!words.length) continue;
     const text = words.map(wd => wd.text).join(' ').trim(); if (!text || (text.length <= 2 && words[0].confidence < 75)) continue;
     const bb = { x0: Math.min(...words.map(wd => wd.bbox.x0)), y0: Math.min(...words.map(wd => wd.bbox.y0)), x1: Math.max(...words.map(wd => wd.bbox.x1)), y1: Math.max(...words.map(wd => wd.bbox.y1)) };
@@ -4394,7 +4451,7 @@ document.fonts.addEventListener('loadingdone', () => { renderAll(); renderCoverL
 
 /* A read-only handle on the live state, for the console and for tests. */
 window.__rcs = { get settings() { return settings; }, get covers() { return covers; }, get doc() { return doc; }, get spanOpts() { return spanOpts; }, get mosaicOpts() { return mosaicOpts; }, assetsOf, setSpanAt, switchView, adGroups, renderAds, renderBlob,
-  get ORG() { return ORG; }, get DEC() { return DEC; }, deleteRecs, moveToAlbum, setFav, setLabel, newAlbum, decOpen, decLoad, decAnalyse, decBuild, orgRerender, moveToSet, adSetChoices, seedFinalSet,
+  get ORG() { return ORG; }, get DEC() { return DEC; }, deleteRecs, moveToAlbum, setFav, setLabel, newAlbum, decOpen, decLoad, decAnalyse, decBuild, orgRerender, moveToSet, adSetChoices, seedFinalSet, bfsFill, dilate,
   // test hook: the drawn box of every layer of a doc, at 1:1
   layerBoxes(d) { const b = {}, sz = sizeOf(d), c = document.createElement('canvas'); c.width = sz.w; c.height = sz.h; render(c.getContext('2d'), d, 1, b); return b; } };
 
@@ -4420,6 +4477,7 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   if (FINAL_SET && settings.finalSet !== FINAL_SET) { try { await seedFinalSet(); } catch (e) { console.warn('final set', e); } }
   try { await seedFinalCta(); } catch (e) { console.warn('final cta', e); }
   try { await seedFinalCtaRound(); } catch (e) { console.warn('final cta round', e); }
+  try { await seedFinalEditable(); } catch (e) { console.warn('final editable', e); }
   if (settings.adSig !== AD_SIG) { try { await enlargeAdSigs(); } catch (e) { console.warn('ad footer', e); } }
   const todo = location.hash === '#todo';
   if (todo && settings.reelSet !== REEL_SET) { try { await seedReelSet(); } catch (e) { console.warn('reel set', e); } }

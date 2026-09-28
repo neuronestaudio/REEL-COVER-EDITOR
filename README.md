@@ -150,6 +150,23 @@ cover in that browser. On a static ad a badge replaces the board's own footer li
 lays the board out again inside the safe box; on anything else it lands as ordinary layers near
 the foot. Either way it is one undo step.
 
+**The submission boards are editable.** Every board in FINAL ADS SUBMISSION except the seiza
+portrait is now a real static ad: its background is the take's own picture with the printed type
+erased (`assets/final/plates/`, built by running the studio's own reader over each export — OCR
+glyph masks unioned over three passes, every mark and rule box, the red bar, and the signature
+strip band, filled with the onion fill), and the words are live layers laid out by the ad
+engine, so the headline, sub-line and button edit like any other board, and CTA badges and
+Submission CTA work on them. The wording comes from the board's source copy, with `final.js`
+overrides for the takes whose words were edited before export (F08's sub-line, F10's headline
+and quote), and the button keeps whatever the board's call to action said at the time. Four
+plates (F05–F08) carry visible retouching where type sat on the bright gym photograph and are
+flagged on the board; a few others keep a faint one-or-two-letter ghost. `settings.finalEdit`
+gates the one-time rebuild; a board already made editable, or edited by hand, is never touched.
+
+Two reader improvements came out of this: the second OCR polarity always runs now (type on a
+bright patch of a dark picture was never looked for once the dark areas had read well), and
+`DEC.minConf` lets a caller keep badly-read words when only their boxes matter.
+
 **One call to action across the submission.** The boards in FINAL ADS SUBMISSION are finished
 pictures with their old call to action printed on them, so a new one is laid over the top: a bar
 the exact size of the old one, in the same vermilion, with the line centred on it. `final.js`

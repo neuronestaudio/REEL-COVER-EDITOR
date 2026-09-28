@@ -38,7 +38,12 @@ window.__RTS_FINAL__ = {
     "w": 0.6667,
     "h": 94
    },
-   "ctaNow": "Helping people understand their patterns, regulate their reactions and make choices that feel more aligned with who they are."
+   "ctaNow": "Helping people understand their patterns, regulate their reactions and make choices that feel more aligned with who they are.",
+   "plate": "assets/final/plates/f02-b2e886dcb5.jpg",
+   "edit": {
+    "setKey": "v3",
+    "rough": false
+   }
   },
   {
    "id": "F03",
@@ -56,7 +61,12 @@ window.__RTS_FINAL__ = {
     "w": 1.0,
     "h": 101
    },
-   "ctaNow": "Combining 17+ years of karate and coaching to help people move through life with greater awareness, intention and self-worth."
+   "ctaNow": "Combining 17+ years of karate and coaching to help people move through life with greater awareness, intention and self-worth.",
+   "plate": "assets/final/plates/f03-ca202e489d.jpg",
+   "edit": {
+    "setKey": "v3",
+    "rough": false
+   }
   },
   {
    "id": "F04",
@@ -74,7 +84,12 @@ window.__RTS_FINAL__ = {
     "w": 1.0,
     "h": 53
    },
-   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space between what they feel and how they respond."
+   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space between what they feel and how they respond.",
+   "plate": "assets/final/plates/f04-3920272967.jpg",
+   "edit": {
+    "setKey": "v3",
+    "rough": false
+   }
   },
   {
    "id": "F05",
@@ -92,7 +107,12 @@ window.__RTS_FINAL__ = {
     "w": 1.0,
     "h": 53
    },
-   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space between what they feel and how they respond."
+   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space between what they feel and how they respond.",
+   "plate": "assets/final/plates/f05-41c4dbe2fe.jpg",
+   "edit": {
+    "setKey": "v3",
+    "rough": true
+   }
   },
   {
    "id": "F06",
@@ -110,7 +130,12 @@ window.__RTS_FINAL__ = {
     "w": 1.0,
     "h": 204
    },
-   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space between what they feel and how they respond."
+   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space between what they feel and how they respond.",
+   "plate": "assets/final/plates/f06-35b89e3331.jpg",
+   "edit": {
+    "setKey": "v3",
+    "rough": true
+   }
   },
   {
    "id": "F07",
@@ -128,7 +153,12 @@ window.__RTS_FINAL__ = {
     "w": 1.0,
     "h": 204
    },
-   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space between what they feel and how they respond."
+   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space between what they feel and how they respond.",
+   "plate": "assets/final/plates/f07-a81c92fc71.jpg",
+   "edit": {
+    "setKey": "v3",
+    "rough": true
+   }
   },
   {
    "id": "F08",
@@ -146,7 +176,15 @@ window.__RTS_FINAL__ = {
     "w": 0.5111,
     "h": 106
    },
-   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space so they can truly connect to their intentions and values."
+   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space so they can truly connect to their intentions and values.",
+   "plate": "assets/final/plates/f08-0171957451.jpg",
+   "edit": {
+    "setKey": "v3",
+    "rough": true,
+    "copy": {
+     "sub": "Helping those who have achieved external success but are disconnected from themselves"
+    }
+   }
   },
   {
    "id": "F09",
@@ -164,7 +202,12 @@ window.__RTS_FINAL__ = {
     "w": 1.0,
     "h": 53
    },
-   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space between what they feel and how they respond."
+   "ctaNow": "Blending martial arts, presence and personal coaching to help people create space between what they feel and how they respond.",
+   "plate": "assets/final/plates/f09-c6a8ce70cb.jpg",
+   "edit": {
+    "setKey": "v3",
+    "rough": false
+   }
   },
   {
    "id": "F10",
@@ -182,7 +225,16 @@ window.__RTS_FINAL__ = {
     "w": 0.5574,
     "h": 98
    },
-   "ctaNow": "Combining 17+ Years of Karate, personal coaching , and somatic breathwork to help people move through life with greater awareness, intention and self-worth."
+   "ctaNow": "Combining 17+ Years of Karate, personal coaching , and somatic breathwork to help people move through life with greater awareness, intention and self-worth.",
+   "plate": "assets/final/plates/f10-7dfccd8ba5.jpg",
+   "edit": {
+    "setKey": "v3",
+    "rough": false,
+    "copy": {
+     "head": "Learn to connect to that part of you that you always ignore, so you dont have to experience another burn out.",
+     "sub": "\"strength without awareness is just tension.\""
+    }
+   }
   },
   {
    "id": "F11",
@@ -200,7 +252,12 @@ window.__RTS_FINAL__ = {
     "w": 0.3685,
     "h": 53
    },
-   "ctaNow": "See how the 12 weeks work"
+   "ctaNow": "See how the 12 weeks work",
+   "plate": "assets/final/plates/f11-5f8ffd0fb5.jpg",
+   "edit": {
+    "setKey": "v3",
+    "rough": false
+   }
   },
   {
    "id": "F12",
@@ -218,7 +275,12 @@ window.__RTS_FINAL__ = {
     "w": 0.3685,
     "h": 53
    },
-   "ctaNow": "See how the 12 weeks work"
+   "ctaNow": "See how the 12 weeks work",
+   "plate": "assets/final/plates/f12-0556d7175c.jpg",
+   "edit": {
+    "setKey": "v3",
+    "rough": false
+   }
   },
   {
    "id": "F13",
@@ -236,7 +298,12 @@ window.__RTS_FINAL__ = {
     "w": 0.3685,
     "h": 53
    },
-   "ctaNow": "See how the 12 weeks work"
+   "ctaNow": "See how the 12 weeks work",
+   "plate": "assets/final/plates/f13-cce8b9c4da.jpg",
+   "edit": {
+    "setKey": "v3",
+    "rough": false
+   }
   },
   {
    "id": "F14",
@@ -254,7 +321,12 @@ window.__RTS_FINAL__ = {
     "w": 1.0,
     "h": 52
    },
-   "ctaNow": "Combining 17+ years of karate , personal coach, and breathwork training to empower individuals to connect with their core values"
+   "ctaNow": "Combining 17+ years of karate , personal coach, and breathwork training to empower individuals to connect with their core values",
+   "plate": "assets/final/plates/f14-ea655e307e.jpg",
+   "edit": {
+    "setKey": "v3",
+    "rough": false
+   }
   },
   {
    "id": "F15",
@@ -272,7 +344,12 @@ window.__RTS_FINAL__ = {
     "w": 0.3694,
     "h": 53
    },
-   "ctaNow": "Gain back agency of your life"
+   "ctaNow": "Gain back agency of your life",
+   "plate": "assets/final/plates/f15-af1cf9bcc6.jpg",
+   "edit": {
+    "setKey": "v3",
+    "rough": false
+   }
   },
   {
    "id": "F16",
@@ -290,7 +367,12 @@ window.__RTS_FINAL__ = {
     "w": 0.9222,
     "h": 186
    },
-   "ctaNow": "Helping people understand their patterns, regulate their reactions and make choices that feel more aligned with who they are."
+   "ctaNow": "Helping people understand their patterns, regulate their reactions and make choices that feel more aligned with who they are.",
+   "plate": "assets/final/plates/f16-18f88f1f0c.jpg",
+   "edit": {
+    "setKey": "v3",
+    "rough": false
+   }
   },
   {
    "id": "F17",
@@ -308,7 +390,12 @@ window.__RTS_FINAL__ = {
     "w": 0.837,
     "h": 66
    },
-   "ctaNow": "This is for you, if you want to connect with your loved ones but your upbringing makes it feel like its impossible."
+   "ctaNow": "This is for you, if you want to connect with your loved ones but your upbringing makes it feel like its impossible.",
+   "plate": "assets/final/plates/f17-ae5ba81c5a.jpg",
+   "edit": {
+    "setKey": "v1",
+    "rough": false
+   }
   },
   {
    "id": "F18",
@@ -326,7 +413,12 @@ window.__RTS_FINAL__ = {
     "w": 0.7231,
     "h": 53
    },
-   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values"
+   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values",
+   "plate": "assets/final/plates/f18-ab68362b74.jpg",
+   "edit": {
+    "setKey": "v2",
+    "rough": false
+   }
   },
   {
    "id": "F19",
@@ -344,7 +436,12 @@ window.__RTS_FINAL__ = {
     "w": 0.7231,
     "h": 53
    },
-   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values"
+   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values",
+   "plate": "assets/final/plates/f19-85d88e6457.jpg",
+   "edit": {
+    "setKey": "v2",
+    "rough": false
+   }
   },
   {
    "id": "F20",
@@ -362,7 +459,12 @@ window.__RTS_FINAL__ = {
     "w": 0.7074,
     "h": 53
    },
-   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values"
+   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values",
+   "plate": "assets/final/plates/f20-42cc12e80b.jpg",
+   "edit": {
+    "setKey": "v2",
+    "rough": false
+   }
   },
   {
    "id": "F21",
@@ -380,7 +482,12 @@ window.__RTS_FINAL__ = {
     "w": 0.7074,
     "h": 53
    },
-   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values"
+   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values",
+   "plate": "assets/final/plates/f21-c8a503b97a.jpg",
+   "edit": {
+    "setKey": "v2",
+    "rough": false
+   }
   },
   {
    "id": "F22",
@@ -398,7 +505,12 @@ window.__RTS_FINAL__ = {
     "w": 0.7074,
     "h": 53
    },
-   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values"
+   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values",
+   "plate": "assets/final/plates/f22-5c6e0761c4.jpg",
+   "edit": {
+    "setKey": "v2",
+    "rough": false
+   }
   },
   {
    "id": "F23",
@@ -416,7 +528,12 @@ window.__RTS_FINAL__ = {
     "w": 0.7528,
     "h": 52
    },
-   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values"
+   "ctaNow": "Combining 17+ years of karate and teaching to empower individuals to return to their core values",
+   "plate": "assets/final/plates/f23-635c32d8fd.jpg",
+   "edit": {
+    "setKey": "v2",
+    "rough": false
+   }
   }
  ]
 };
