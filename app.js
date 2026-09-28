@@ -3273,7 +3273,7 @@ $('#btnExportCarousels').onclick = () => exportAllCarousels();
    board once at 1080×1350 and never rebuilds one that is already there. A square
    or story variant is a second document with the same copy on a new frame. */
 const AD_SET = 'rts-ads-v2';   // v2: adds Static Set v3, the nine angles (25 Sep 2026)
-const AD_LAYOUT = 2;   // adLayers revision: 2 = inside the safe box, sentence-case regular headline (25 Sep 2026)
+const AD_LAYOUT = 3;   // 3 = the signature strip fully inside the safe box, anchored by its bottom edge (28 Sep 2026); 2 = safe box + sentence-case headline
 const AD_FRAMES = { '4x5': { w: 1080, h: 1350, label: 'Feed 4:5' }, '1x1': { w: 1080, h: 1080, label: 'Square 1:1' }, '9x16': { w: 1080, h: 1920, label: 'Story 9:16' } };
 const rtsAds = () => window.__RTS_ADS__ || { sets: [], plates: [] };
 const staticById = id => (window.__RTS_STATICS__ || []).find(s => s.id === id) || {};
@@ -3312,8 +3312,10 @@ const AD_INSET = 86;
    place and the strip grows down into the margin (about 67px from the foot instead of 86). */
 const AD_SIG = 1.3;
 function adSigY() {
-  const s1 = sigExtent(1), sk = sigExtent(AD_SIG);
-  return H - AD_INSET - s1.down - s1.up + sk.up;
+  /* Anchored by its BOTTOM edge, a breath above the safe box floor. The first
+     enlargement kept the top edge fixed and let the strip grow down past the
+     box, which put the crests and the small caps right on the frame edge. */
+  return H - AD_INSET - 6 - sigExtent(AD_SIG).down;
 }
 /* Boards laid out with the smaller strip get the bigger one in place: only the strip's own layers are
    replaced, and only on a board whose strip is still where and how the layout put it, so a strip that

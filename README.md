@@ -193,8 +193,7 @@ dead layer reading *and regulate your fear* underneath. F01 is a bare portrait w
 action on it and is left alone.
 
 **Ad footer** — on every static ad the signature strip (ensō mark, name, role line, both dojo
-crests) is drawn 1.3× the reel-cover size (`AD_SIG` in `app.js`), with its top edge where the
-smaller strip's was, so it grows into the bottom margin and the copy above does not move. Boards
+crests) is drawn 1.3× the reel-cover size (`AD_SIG` in `app.js`), anchored by its bottom edge a breath above the safe box floor, so the whole strip sits comfortably inside the dashed border (`AD_LAYOUT` 3; the first enlargement let it grow down past the box and onto the frame edge). Boards
 made before the change get the bigger strip once, and only where the strip is still as the layout
 left it; one moved or resized by hand is left alone.
 
