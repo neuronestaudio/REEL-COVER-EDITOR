@@ -2691,8 +2691,9 @@ function bindBlocks() {
    with "Submission CTA" on the set card) and every board in the set is laid out
    again with it; bump FINAL_CTA_REV to push a new line to browsers that already
    hold the set. */
-const FINAL_CTA = 'If this resonates, learn more here';
-const FINAL_CTA_REV = 'cta-1';
+const FINAL_CTA = 'If this resonates, let’s talk';
+const FINAL_CTA_ALT = 'Start the Conversation';           // the alternative button, one click away in the CTA list
+const FINAL_CTA_REV = 'cta-2';   // cta-2: "If this resonates, let's talk" across the submission (28 Sep 2026)
 /* The lines the boards in the submission were exported with, read off the
    pictures themselves (final.js `ctaNow`) rather than the brief, because several
    were edited in the studio before they were exported. De-duplicated, and any
@@ -2743,6 +2744,7 @@ async function placeCta(name, line, button) {
   if (doc.ad) {
     pushUndo();
     relayAd(doc, { line, cta: button });
+    if (doc.ad.setKey === FINAL_KEY) { const btn = doc.layers.find(l => l.type === 'rule' && l.role === 'button'); if (btn && !btn.r) btn.r = 12; }
     const l = doc.layers.find(x => x.role === 'line') || doc.layers.find(x => x.role === 'cta');
     if (l) select(l.id);
     commit(); syncAll(); renderAds();
@@ -2773,8 +2775,9 @@ function renderCtas() {
     el.onclick = () => { $('#ctaLine').value = b.line || ''; $('#ctaBtn').value = b.button || ''; placeCta(b.name || b.id || 'CTA', b.line, b.button); renderCtas(); };
     c.appendChild(el);
   };
-  group('The submission CTA');
+  group('The submission CTAs');
   add({ id: 'SUBMISSION', name: 'Submission CTA', line: '', button: FINAL_CTA }, false);
+  add({ id: 'ALT', name: 'Alternative CTA', line: '', button: FINAL_CTA_ALT }, false);
   const sub = submissionCtas();
   const brief = builtinCtas();
   if (brief.length) { group(`From the brief · ${brief.length}`); brief.forEach(b => add(b, false)); }
@@ -2813,12 +2816,21 @@ async function applyFinalCta(text) {
   const byId = new Map((rtsFinal().boards || []).map(b => [b.id, b]));
   let n = 0;
   for (const r of recs) {
-    const b = byId.get(r.doc.ad.id); if (!b || !b.cta) continue;   // f01 carries no call to action
+    const b = byId.get(r.doc.ad.id);
     const d = r.id === doc?.id ? doc : r.doc;
-    const had = (d.layers || []).find(l => l.role === 'finalcta' && l.type === 'text');
-    const line = text || (had && had.text) || settings.finalCtaText || FINAL_CTA;
-    d.layers = (d.layers || []).filter(l => l.role !== 'finalcta');
-    d.layers.push(...withSize(d, () => finalCtaLayers(b.cta, line)));
+    if ((d.layers || []).some(l => l.role === 'head' || l.role === 'cta')) {
+      // an editable board: the button is part of the layout, so lay the board out again with the new words
+      const cur = ((d.layers || []).find(l => l.role === 'cta') || {}).text;
+      relayAd(d, { cta: text || cur || settings.finalCtaText || FINAL_CTA });
+      const btn = (d.layers || []).find(l => l.type === 'rule' && l.role === 'button');
+      if (btn && !btn.r) btn.r = 12;
+    } else {
+      if (!b || !b.cta) continue;   // f01 carries no call to action
+      const had = (d.layers || []).find(l => l.role === 'finalcta' && l.type === 'text');
+      const line = text || (had && had.text) || settings.finalCtaText || FINAL_CTA;
+      d.layers = (d.layers || []).filter(l => l.role !== 'finalcta');
+      d.layers.push(...withSize(d, () => finalCtaLayers(b.cta, line)));
+    }
     d.updatedAt = r.updatedAt = Date.now(); r.doc = d; n++;
   }
   await store.saveCovers(recs);
@@ -3386,6 +3398,7 @@ function relayAd(d, over) {
     const own = old.filter(l => !l.role && !isSig(l));
     const fresh = adLayers({ ...copy, layout: d.ad.layout });
     for (const l of fresh) {
+      if (l.type === 'rule' && l.role === 'button') { const o = old.find(x => x.type === 'rule' && x.role === 'button'); if (o && o.r) l.r = o.r; continue; }
       if (l.type !== 'text' || !l.role) continue;
       const o = old.find(x => x.type === 'text' && x.role === l.role); if (!o) continue;
       if (o.spans && o.spans.length) l.spans = JSON.parse(JSON.stringify(o.spans));

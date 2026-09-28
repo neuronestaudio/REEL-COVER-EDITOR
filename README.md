@@ -140,7 +140,7 @@ refresh script clears and rewrites them, so re-run it and push whenever the feed
 **CTA badges** — one click puts a call to action on the open cover: a positioning line and,
 if it has one, a button. **Every entry is listed as the line it actually says**, with its code
 kept as a quiet label on the right — picking one used to mean opening *CTA 01*, *CTA 02* and the
-rest in turn to find out what they were. They come in three groups: the submission CTA, the eight
+rest in turn to find out what they were. They come in three groups: the submission CTAs (the one applied across the set, and the alternative button one click away), the eight
 lines from Harrison's static ad brief (`ads.js`, `ctas`, each with the *See how the 12 weeks work*
 button), and the lines the boards in **FINAL ADS SUBMISSION** were actually exported with, read
 off the pictures themselves and de-duplicated against the brief (`final.js`, `ctaNow`) — several
@@ -171,7 +171,9 @@ bright patch of a dark picture was never looked for once the dark areas had read
 pictures with their old call to action printed on them, so a new one is laid over the top: a bar
 the exact size of the old one, in the same vermilion, with the line centred on it. `final.js`
 carries that rectangle (`cta`) and the old wording (`ctaNow`) for every board, measured from the
-picture. **Submission CTA** on the set card sets the line for the whole set; `FINAL_CTA` is what
+picture. **Submission CTA** on the set card sets the line for the whole set — on a board that has been
+made editable it re-lays the board through the ad engine rather than laying a bar over it, and
+a re-lay keeps the button's rounded ends the way text keeps its spans. `FINAL_CTA` is what
 a browser seeds with and bumping `FINAL_CTA_REV` pushes a new line to browsers that already hold
 the set. Applying with no line at all re-lays every board with the wording it already carries,
 which is how the shape can be changed without overwriting a line someone has edited by hand
