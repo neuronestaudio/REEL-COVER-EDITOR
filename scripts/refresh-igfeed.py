@@ -25,7 +25,7 @@ FEED_DIR = os.path.join(ROOT, "assets", "feed")
 TOKEN_FILE = r"D:\CLIENTS\HARRISON\HarrisonSaito-VideoArchive\00. CONTENT LIBRARY\scripts\ig-live\.secrets\token.json"
 IG_USER = "17841464493545504"
 V = "v23.0"
-LIMIT = 18                      # a phone shows ~4 rows; a few spare beyond that
+LIMIT = 200                     # the whole account (74 posts today), newest first
 
 try:
     from PIL import Image
@@ -58,7 +58,15 @@ for old in os.listdir(FEED_DIR):                      # hashes change name, so c
     os.remove(os.path.join(FEED_DIR, old))
 
 prof = get(IG_USER, fields="username,name,biography,profile_picture_url,followers_count,follows_count,media_count")
-media = get(f"{IG_USER}/media", fields="id,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,caption", limit=LIMIT)["data"]
+media, after = [], None
+while len(media) < LIMIT:
+    page = get(f"{IG_USER}/media", fields="id,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,caption",
+               limit=50, **({"after": after} if after else {}))
+    media += page.get("data", [])
+    after = page.get("paging", {}).get("cursors", {}).get("after")
+    if not after or not page.get("paging", {}).get("next"):
+        break
+media = media[:LIMIT]
 
 posts = []
 for i, m in enumerate(media):
