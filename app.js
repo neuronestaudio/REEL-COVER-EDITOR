@@ -1611,11 +1611,73 @@ $('#btnExportAll').onclick = async () => {
   const blob = await zip.generateAsync({ type: 'blob' }); await store.download('reel-covers.zip', blob);
 };
 
-/* ---------------- grid view ---------------- */
+/* ---------------- grid view ----------------
+   Two sources. "Live IG feed" is Harrison's actual profile (igfeed.js, pulled by
+   scripts/refresh-igfeed.py), with the studio's candidate laid over the top-left
+   tiles, so a new post is judged against what the account really looks like
+   today. "Studio covers" is the original mock built from settings.gridOrder. The
+   candidate is whatever the organiser has selected, or the open document. */
+const igFeed = () => window.__IG_FEED__ || null;
+const FEED_VIEW = 'live-1';
+function feedCandidates() {
+  const sel = [...ORG.sel].map(id => covers.find(c => c.id === id)).filter(Boolean);
+  if (sel.length) return sel;
+  const rec = covers.find(c => c.id === doc?.id);
+  return rec ? [rec] : [];
+}
+function renderLiveGrid() {
+  const f = igFeed(), p = f.profile || {};
+  $('#phHandle').textContent = p.handle || settings.handle;
+  $('#phName').textContent = p.name || settings.name;
+  $('#phCat').textContent = settings.category || ''; $('#phCat').hidden = !settings.category;
+  $('#phBio').innerHTML = escapeHtml(p.bio || '').replace(/\n/g, '<br>');
+  const lk = $('#phLink'); lk.textContent = settings.link || ''; lk.hidden = !settings.link;
+  $('#phFollowedBy').innerHTML = '';
+  const av = $('#phAvatar'); av.innerHTML = '';
+  if (p.avatar) { const i = new Image(); i.src = p.avatar; i.alt = ''; av.appendChild(i); }
+  else av.textContent = (p.name || '?').trim()[0].toUpperCase();
+  $('#phPosts').textContent = p.posts || '0';
+  $('#phFollowers').textContent = p.followers || '0';
+  $('#phFollowing').textContent = p.following || '0';
+  const ig = $('#igrid'); ig.className = 'igrid' + (settings.shape === '34' ? ' crop34' : ''); ig.innerHTML = '';
+  const cands = feedCandidates();
+  cands.forEach(r => {
+    const t = document.createElement('div'); t.className = 'tile';
+    const d = r.id === doc?.id ? doc : r.doc;
+    t.innerHTML = '<span class="newtag">NEW</span>';
+    t.prepend(lazyCanvas(d, 130 * 2));
+    t.title = `${r.name} — the candidate. Double-click to edit; select boards in the organiser to try several.`;
+    t.addEventListener('dblclick', () => { loadDoc(d); switchView('editor'); });
+    ig.appendChild(t);
+  });
+  (f.posts || []).forEach(post => {
+    const t = document.createElement('div'); t.className = 'tile';
+    if (post.product === 'REELS') t.innerHTML = '<div class="play"></div>';
+    const im = new Image(); im.className = 'feed'; im.loading = 'lazy'; im.src = post.thumb; im.alt = post.caption || '';
+    t.prepend(im);
+    t.title = (post.caption ? post.caption + '\n\n' : '') + 'His real post — click to open it on Instagram';
+    if (post.permalink) t.addEventListener('click', () => window.open(post.permalink, '_blank'));
+    ig.appendChild(t);
+  });
+  const note = $('#gFeedNote');
+  note.hidden = false;
+  note.innerHTML = `The real <b>@${escapeHtml(p.handle || '')}</b> feed, pulled <b>${escapeHtml(f.at || '')}</b> — ${cands.length === 1 ? 'the open document sits' : cands.length + ' selected boards sit'} on top as the new post. Refresh it with <span class="mono">python scripts/refresh-igfeed.py</span>, then push.`;
+  $('#gridEmpty').hidden = true;
+  const gl = $('#gridList'); gl.innerHTML = '<div class="empty">The live feed keeps Instagram\u2019s own order \u2014 switch to Studio covers to arrange tiles by hand.</div>';
+  const pool = $('#gridPool'); pool.innerHTML = '';
+}
 function gridOrdered() { const inGrid = (settings.gridOrder || []).map(id => covers.find(c => c.id === id)).filter(Boolean); const rest = covers.filter(c => !isFeed(c.doc) && !settings.gridOrder?.includes(c.id)).sort((a, b) => b.updatedAt - a.updatedAt); return [...inGrid, ...rest]; }
 let gridDrag = null;
 function renderGrid() {
   if (!$('#view-grid').classList.contains('active')) return;
+  const live = settings.gridView !== 'studio' && igFeed();
+  $('#gSrcLive').setAttribute('aria-pressed', !!live); $('#gSrcStudio').setAttribute('aria-pressed', !live);
+  $('#gSrcLive').disabled = !igFeed();
+  PROFILE_FIELDS.forEach(([id, key]) => { const el = $('#' + id); if (el && document.activeElement !== el) el.value = settings[key] || ''; });
+  $('#gShape916').setAttribute('aria-pressed', settings.shape !== '34'); $('#gShape34').setAttribute('aria-pressed', settings.shape === '34');
+  $$('#phTabs [data-shape]').forEach(t => t.classList.toggle('on', (t.dataset.shape === '34') === (settings.shape === '34')));
+  if (live) return renderLiveGrid();
+  $('#gFeedNote').hidden = true;
   $('#phHandle').textContent = settings.handle;
   $('#phName').textContent = settings.name;
   $('#phCat').textContent = settings.category || '';
@@ -1706,6 +1768,8 @@ const PROFILE_FIELDS = [['gHandle', 'handle'], ['gName', 'name'], ['gCat', 'cate
 PROFILE_FIELDS.forEach(([id, key]) => $('#' + id).addEventListener('input', e => { settings[key] = e.target.value; saveSettingsSoon(); renderGrid(); }));
 $('#gAvatar').onclick = () => pickFile(async f => { const rec = await store.putAsset(f, 'avatar', 'profile picture'); settings.avatar = rec.id; saveSettingsSoon(); renderGrid(); });
 $('#gAvatarClear').onclick = async () => { const id = settings.avatar; settings.avatar = null; saveSettingsSoon(); renderGrid(); if (id) await store.deleteAsset(id); };
+$('#gSrcLive').onclick = () => { settings.gridView = 'live'; saveSettingsSoon(); renderGrid(); };
+$('#gSrcStudio').onclick = () => { settings.gridView = 'studio'; saveSettingsSoon(); renderGrid(); };
 $('#gShape916').onclick = () => { settings.shape = '916'; saveSettingsSoon(); renderGrid(); };
 $('#gShape34').onclick = () => { settings.shape = '34'; saveSettingsSoon(); renderGrid(); };
 // the phone's own GRID / REELS tabs switch the tile shape too, like the real app
@@ -4360,6 +4424,7 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   const todo = location.hash === '#todo';
   if (todo && settings.reelSet !== REEL_SET) { try { await seedReelSet(); } catch (e) { console.warn('reel set', e); } }
   if (settings.demoView !== DEMO_VIEW) { settings.shape = '34'; settings.demoView = DEMO_VIEW; store.saveSettings(settings).catch(() => {}); }
+  if (settings.feedView !== FEED_VIEW && igFeed()) { settings.gridView = 'live'; settings.feedView = FEED_VIEW; store.saveSettings(settings).catch(() => {}); }
   if (covers.length) loadDoc([...covers].sort((a, b) => b.updatedAt - a.updatedAt)[0].doc);
   else { // seed a first set from the templates so the studio opens with something to look at
     for (const t of TEMPLATES.slice(0, 3)) { const d = t.make(); d.id = uid(); covers.push({ id: d.id, name: d.name, createdAt: d.createdAt, updatedAt: d.updatedAt - 1000, doc: d, versions: [] }); }

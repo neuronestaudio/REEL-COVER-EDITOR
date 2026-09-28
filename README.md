@@ -127,6 +127,16 @@ button. **Save as block** keeps the open cover's layers — or only the selected
 block of your own, so a lock-up built once on any cover can be pasted onto every other one.
 Own blocks live in that browser's settings; every paste is ordinary layers and one undo step.
 
+**Live IG feed** — the Profile grid opens on Harrison's actual Instagram profile: his real
+avatar, bio and counts, and his latest posts pulled from the Graph API (`igfeed.js` +
+`assets/feed/`, written by `scripts/refresh-igfeed.py`, which reads the token ig-live already
+maintains). The studio's candidate sits on the top-left tiles marked **NEW** — the open document,
+or every board selected in the organiser — so a new post is judged against what the account
+really looks like today, not a mock. Clicking a real tile opens that post on Instagram.
+**Studio covers** switches back to the original hand-arranged grid, and the choice sticks per
+browser. Feed thumbnails are named by content hash because `/assets/` is served immutable; the
+refresh script clears and rewrites them, so re-run it and push whenever the feed should catch up.
+
 **CTA badges** — one click puts a call to action on the open cover: a positioning line and,
 if it has one, a button. **Every entry is listed as the line it actually says**, with its code
 kept as a quiet label on the right — picking one used to mean opening *CTA 01*, *CTA 02* and the
