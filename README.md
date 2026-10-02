@@ -47,6 +47,14 @@ and checks the key (`STUDIO_UPLOAD_KEY`) on anything that writes. Photos are shr
 JPEG in the browser first. Covers still live only in the browser that made them. Run
 `npx vercel dev` rather than a plain static server to have the shared library locally.
 
+**Taking photos out of the library, for everyone** — the ✕ on any built-in or shared photo takes it out
+of every browser's library (team key once per device); the **Removed** group puts it back. The list is
+`library.json` in this repo, read and written by `api/library.js` through the GitHub API, so a removal is
+a commit. The picture itself is never deleted, so covers and boards already using it keep painting.
+Writing needs `GITHUB_TOKEN` in the Vercel project (fine-grained, Contents read/write on this repo only).
+Built-in photos added for everyone (Harrison's uploads, the full moon session) are in `library.js` +
+`assets/library/` (hash-named, because `/assets/` is cached immutable).
+
 **Part colour** — select any words inside a caption and give just those a different colour, so
 one heading can carry an accent without being split into separate layers. Select in the text
 box, then pick from **Part colour**; **Clear** returns the selection to the layer colour, or

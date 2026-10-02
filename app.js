@@ -124,6 +124,8 @@ const BUILTIN = {
 for (const p of window.__PEOPLE_PHOTOS__ || []) BUILTIN[p.id] = { id: p.id, kind: 'photo', name: p.name, url: p.url, thumb: p.thumb, group: p.group, builtin: true };
 for (const p of [].concat(window.__DAY1_STILLS__ || [], (window.__RTS_ADS__ || {}).plates || [])) BUILTIN[p.id] = { id: p.id, kind: 'photo', name: p.name, url: p.url, thumb: p.thumb, group: p.group, builtin: true };
 for (const p of (window.__RTS_FINAL__ || {}).boards || []) BUILTIN[p.id] = { id: p.id, kind: 'photo', name: p.name, url: p.url, thumb: p.thumb, group: 'Final submission', builtin: true };
+// Harrison's own uploads and the full moon session (library.js), built in for everyone.
+for (const p of window.__LIBRARY_PHOTOS__ || []) BUILTIN[p.id] = { id: p.id, kind: 'photo', name: p.name, url: p.url, thumb: p.thumb, group: p.group, builtin: true };
 const BUILTIN_NAMES = new Set(Object.values(BUILTIN).map(a => a.name));
 /* A photo someone imported by folder before it was built in: still loaded, because a cover may
    point at it, but kept out of the library so the picture is not listed twice. */
@@ -899,9 +901,47 @@ function photoGroup(a) {
   const m = /^[A-Za-z]{1,3}\d+ - ([A-Za-z]+) - /.exec(a.name || '');
   return m ? m[1][0].toUpperCase() + m[1].slice(1).toLowerCase() : 'Uploads';
 }
+/* Photos taken out of the library for everyone: library.json in the repo, changed live
+   through api/library.js (a removal is a commit). Taking a photo out never deletes the
+   picture, so a cover or board already using it keeps painting, and the Removed group
+   puts it back. A browser's own uploads are not on the server, so their ✕ stays local. */
+const LIB_HIDDEN = new Set();
+try { JSON.parse(localStorage.getItem('rcs.libHidden') || '[]').forEach(id => LIB_HIDDEN.add(id)); } catch {}
+function libHiddenSet(ids) { LIB_HIDDEN.clear(); ids.forEach(id => LIB_HIDDEN.add(id)); try { localStorage.setItem('rcs.libHidden', JSON.stringify([...LIB_HIDDEN])); } catch {} }
+async function loadLibHidden() {
+  // whoever just changed the list asks past the edge cache for a while
+  let bust = ''; try { const t = +localStorage.getItem('rcs.libBust'); if (t && Date.now() - t < 10 * 60e3) bust = '?t=' + t; } catch {}
+  for (const url of ['api/library' + bust, 'library.json']) {
+    try {
+      const r = await fetch(url, { headers: { accept: 'application/json' } });
+      if (!r.ok || !/json/.test(r.headers.get('content-type') || '')) continue;
+      const d = await r.json(); if (Array.isArray(d.hidden)) { libHiddenSet(d.hidden); break; }
+    } catch {}
+  }
+  if (doc) { renderBgPick(); renderPool(); }
+}
+async function libSetHidden(a, hide) {
+  if (hide && !confirm(`Take “${a.name}” out of the library for everyone?\n\nThe picture is kept, so anything already using it still shows it, and it can be put back from the Removed group.`)) return;
+  const key = shareKey(); if (!key) return;
+  const flip = on => { on ? LIB_HIDDEN.add(a.id) : LIB_HIDDEN.delete(a.id); };
+  flip(hide); renderBgPick();   // shown at once, undone below if the server says no
+  let r = null, j = {};
+  try { r = await fetch(`api/library?${hide ? 'hide' : 'show'}=${encodeURIComponent(a.id)}`, { method: 'POST', headers: { 'x-studio-key': key } }); j = await r.json().catch(() => ({})); } catch {}
+  if (r && r.ok) {
+    libHiddenSet(j.hidden || [...LIB_HIDDEN]);
+    try { localStorage.setItem('rcs.libBust', String(Date.now())); } catch {}
+    toast(hide ? 'Taken out of the library, for everyone' : 'Back in the library, for everyone');
+  } else {
+    if (r && r.status === 401) { forgetShareKey(); j.error = 'That upload key was not accepted. Try again with the right key.'; }
+    flip(!hide);
+    toast(j.error || 'The library could not be reached');
+  }
+  renderBgPick(); renderPool();
+}
 function renderBgPick() {
   const c = $('#bgPick'); if (!c) return; c.innerHTML = '';
-  const all = [...assetsOf('photo'), ...assetsOf('bg')].filter(a => !shadowed(a));
+  const every = [...assetsOf('photo'), ...assetsOf('bg')].filter(a => !shadowed(a));
+  const all = every.filter(a => !LIB_HIDDEN.has(a.id)), removed = every.filter(a => LIB_HIDDEN.has(a.id));
   const cur = doc.bg.type === 'image' ? assets[doc.bg.image] : null;
   const th = $('#bgLibThumb'); th.innerHTML = ''; if (cur) { const i = new Image(); i.src = cur.thumb || cur.url; i.alt = ''; th.appendChild(i); }
   $('#bgLibName').textContent = cur ? cur.name : 'No photo chosen';
@@ -909,32 +949,34 @@ function renderBgPick() {
   $('#bgLib').dataset.open = LIB.open; $('#bgLibBar').setAttribute('aria-expanded', LIB.open); $('#bgLibBody').hidden = !LIB.open;
   if (!LIB.open) return;
 
-  const nShared = Object.keys(SHARED).length;
+  const nShared = Object.keys(SHARED).filter(id => !LIB_HIDDEN.has(id)).length;
   $('#bgLibSharedMsg').innerHTML = share.ok === false ? 'Shared photos are offline here.'
     : `<b>Shared</b> · ${nShared} photo${nShared === 1 ? '' : 's'} for everyone`;
   $('#bgLibShare').disabled = share.ok === false || share.busy;
   const counts = new Map(); all.forEach(a => { const g = photoGroup(a); counts.set(g, (counts.get(g) || 0) + 1); });
   const fixed = ['Uploads', 'Shoot', 'Statics', 'Studio'];
-  const groups = ['All', ...(counts.has('Shared') ? ['Shared'] : []), ...[...counts.keys()].filter(g => g !== 'Shared' && !fixed.includes(g)).sort(), ...fixed.filter(g => counts.has(g))];
+  const groups = ['All', ...(counts.has('Shared') ? ['Shared'] : []), ...[...counts.keys()].filter(g => g !== 'Shared' && !fixed.includes(g)).sort(), ...fixed.filter(g => counts.has(g)), ...(removed.length ? ['Removed'] : [])];
   if (!groups.includes(LIB.group)) LIB.group = 'All';
   const gc = $('#bgLibGroups'); gc.innerHTML = '';
   groups.forEach(g => {
     const b = document.createElement('button'); b.className = 'chip'; b.type = 'button'; b.setAttribute('aria-pressed', g === LIB.group);
-    b.innerHTML = `${escapeHtml(g)}<i>${g === 'All' ? all.length : counts.get(g)}</i>`;
+    b.innerHTML = `${escapeHtml(g)}<i>${g === 'All' ? all.length : g === 'Removed' ? removed.length : counts.get(g)}</i>`;
     b.onclick = () => { LIB.group = g; libRemember(); renderBgPick(); };
     gc.appendChild(b);
   });
 
   const q = LIB.q.trim().toLowerCase();
-  const list = all.filter(a => (LIB.group === 'All' || photoGroup(a) === LIB.group) && (!q || (a.name || '').toLowerCase().includes(q)));
+  const gone = LIB.group === 'Removed';
+  const list = (gone ? removed : all).filter(a => (gone || LIB.group === 'All' || photoGroup(a) === LIB.group) && (!q || (a.name || '').toLowerCase().includes(q)));
   const add = document.createElement('button'); add.className = 'addtile'; add.title = 'Upload an image from your computer';
   add.innerHTML = '+<small>UPLOAD</small>'; add.onclick = () => bgUploadFlow(); c.appendChild(add);
   if (!list.length) { const n = document.createElement('div'); n.className = 'none'; n.textContent = q ? `Nothing in the library matches “${LIB.q.trim()}”.` : 'No photos in this group yet.'; c.appendChild(n); }
   list.forEach(a => {
     const b = document.createElement('button'); b.title = a.name; b.setAttribute('aria-pressed', doc.bg.type === 'image' && doc.bg.image === a.id);
     const im = new Image(); im.loading = 'lazy'; im.decoding = 'async'; im.src = a.thumb || a.url; im.alt = a.name; b.appendChild(im);
-    if (a.shared) sharedTile(b, a);
-    else if (!a.builtin) { localShareBtn(b, a); const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕'; x.title = 'Remove'; x.onclick = async e => { e.stopPropagation(); if (!confirm(`Remove “${a.name}”?`)) return; await store.deleteAsset(a.id); if (doc.bg.image === a.id) { doc.bg.image = assetsOf('photo')[0]?.id || 'photo'; commit(); } renderBgPick(); refreshAssetSelects(); }; b.appendChild(x); }
+    if (gone) { b.classList.add('gone'); const k = document.createElement('button'); k.className = 'back'; k.textContent = '↺ Put back'; k.title = 'Put this photo back in the library, for everyone'; k.onclick = e => { e.stopPropagation(); libSetHidden(a, false); }; b.appendChild(k); }
+    else if (a.shared || a.builtin) { if (a.shared) sharedTile(b, a); const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕'; x.title = 'Take out of the library, for everyone'; x.onclick = e => { e.stopPropagation(); libSetHidden(a, true); }; b.appendChild(x); }
+    else { localShareBtn(b, a); const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕'; x.title = 'Remove'; x.onclick = async e => { e.stopPropagation(); if (!confirm(`Remove “${a.name}”?`)) return; await store.deleteAsset(a.id); if (doc.bg.image === a.id) { doc.bg.image = assetsOf('photo')[0]?.id || 'photo'; commit(); } renderBgPick(); refreshAssetSelects(); }; b.appendChild(x); }
     b.onclick = () => { pushUndo(); doc.bg.type = 'image'; doc.bg.image = a.id; commit(); syncAll(); };
     c.appendChild(b);
   });
@@ -1059,20 +1101,8 @@ async function shareFiles(items) {
     : done ? `${done} photo${done > 1 ? 's' : ''} now in the shared library, for everyone${skipped ? ` · ${skipped} already there` : ''}`
       : 'Those photos are already in the shared library');
 }
-async function sharedDelete(a) {
-  if (!confirm(`Remove “${a.name}” from the shared library?\n\nIt disappears for everyone, and any cover using it loses its photo.`)) return;
-  const key = shareKey(); if (!key) return;
-  let r; try { r = await fetch(`${SHARE_API}?id=${a.sid}`, { method: 'DELETE', headers: { 'x-studio-key': key } }); } catch { return toast('Could not reach the shared library'); }
-  if (r.status === 401) { forgetShareKey(); return toast('That upload key was not accepted. Try again with the right key.'); }
-  if (!r.ok) return toast('That photo could not be removed');
-  delete SHARED[a.id]; delete assets[a.id]; sharedCacheSave(); sharedBust();
-  if (doc.bg.image === a.id) { doc.bg.image = assetsOf('photo')[0]?.id || 'photo'; commit(); }
-  sharedRefreshUI(); toast('Removed from the shared library');
-}
 function sharedTile(b, a) {
   const c = document.createElement('span'); c.className = 'cloud'; c.textContent = 'SHARED'; b.appendChild(c);
-  const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕'; x.title = 'Remove from the shared library, for everyone';
-  x.onclick = e => { e.stopPropagation(); sharedDelete(a); }; b.appendChild(x);
 }
 function localShareBtn(b, a) {
   if (share.ok === false) return;
@@ -2176,7 +2206,7 @@ function renderPool() {
     setStatus('saved', 'ok'); refreshAssetSelects(); renderBgPick(); renderPool(); toast(`${files.length} photo${files.length > 1 ? 's' : ''} added`);
   });
   g.appendChild(add);
-  const all = [...assetsOf('photo'), ...assetsOf('bg')].filter(a => !shadowed(a));
+  const all = [...assetsOf('photo'), ...assetsOf('bg')].filter(a => !shadowed(a) && (!LIB_HIDDEN.has(a.id) || batchOpts.pool.includes(a.id)));
   all.forEach(a => {
     const b = document.createElement('button'); b.title = a.name;
     b.setAttribute('aria-pressed', batchOpts.pool.includes(a.id));
@@ -4508,6 +4538,7 @@ window.__rcs = { get settings() { return settings; }, get covers() { return cove
   setStatus('saved in this browser', 'ok');
   getImg('photo'); getImg('cutout');
   const fromPoster = await importFromPoster();
+  loadLibHidden();
   await loadShared();   // the live sets use shared photographs, so they have to be listed first
   if (settings.waLive !== WA_LIVE) { try { await seedWaSets(); } catch (e) { console.warn('live sets', e); } }
   // a first visit, or a link ending #grid, opens straight on the profile
